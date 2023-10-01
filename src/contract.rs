@@ -1,11 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::{Config, CONFIG};
+use crate::state::STAGE;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:neutron-airdrop-transfer";
@@ -16,13 +16,10 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    _: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let main_dao = deps.api.addr_validate(&msg.main_dao)?;
-    CONFIG.save(deps.storage, &Config { main_dao })?;
-
+    STAGE.save(deps.storage, &ExecuteMsg::ClaimUnclaimed {})?;
     Ok(Response::default())
 }
 
@@ -30,23 +27,52 @@ pub fn instantiate(
 pub fn execute(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let current_stage = STAGE.load(deps.storage)?;
+    if current_stage != msg {
+        // TODO: save what stage should be in the error
+        return Err(ContractError::IncorrectStage {});
+    }
+
     match msg {
-        ExecuteMsg::Transfer {} => execute_transfer(deps, info),
+        ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps),
+        ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps),
+        ExecuteMsg::SendClaimedTokensToICA {} => send_claimed_tokens_to_ica(deps),
+        ExecuteMsg::SendTokensToCommunityPool {} => send_tokens_to_community_pool(deps),
+        ExecuteMsg::Done {} => execute_done(),
     }
 }
 
-fn execute_transfer(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-    if config.main_dao != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
-
+fn execute_claim_unclaimed(deps: DepsMut) -> Result<Response, ContractError> {
+    STAGE.save(deps.storage, &ExecuteMsg::CreateHubICA {})?;
     // TODO: transfer
 
     Ok(Response::default())
+}
+
+fn execute_create_hub_ica(deps: DepsMut) -> Result<Response, ContractError> {
+    STAGE.save(deps.storage, &ExecuteMsg::SendClaimedTokensToICA {})?;
+
+    Ok(Response::default())
+}
+
+fn send_claimed_tokens_to_ica(deps: DepsMut) -> Result<Response, ContractError> {
+    STAGE.save(deps.storage, &ExecuteMsg::SendTokensToCommunityPool {})?;
+
+    Ok(Response::default())
+}
+
+fn send_tokens_to_community_pool(deps: DepsMut) -> Result<Response, ContractError> {
+    STAGE.save(deps.storage, &ExecuteMsg::Done {})?;
+    Ok(Response::default())
+}
+
+fn execute_done() -> Result<Response, ContractError> {
+    Err(ContractError::Std(StdError::generic_err(
+        "cannot execute, sending is already done",
+    )))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

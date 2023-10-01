@@ -7,7 +7,11 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Transfer {},
+    ClaimUnclaimed {},
+    CreateHubICA {},
+    SendClaimedTokensToICA {},
+    SendTokensToCommunityPool {},
+    Done {},
 }
 
 #[cw_serde]

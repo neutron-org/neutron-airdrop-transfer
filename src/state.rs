@@ -1,11 +1,6 @@
-use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Addr;
+use crate::msg::ExecuteMsg;
 use cw_storage_plus::Item;
 
-pub const CONFIG: Item<Config> = Item::new("config");
+pub type Stage = ExecuteMsg;
 
-#[cw_serde]
-pub struct Config {
-    // only main dao can execute Transfer msg
-    pub main_dao: Addr,
-}
+pub const STAGE: Item<Stage> = Item::new("stage");
