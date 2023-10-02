@@ -2,7 +2,26 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub main_dao: String,
+    // connection_id between neutron-1 and cosmoshub-4 to make IBC transactions
+    pub connection_id: String,
+
+    // airdrop contract address that we claim neutrons from
+    pub airdrop_address: String,
+
+    // fee to register interchain transaction
+    // pub register_fee: Vec<CoinSDK>,
+
+    // interchain account id we're creating (any string?)
+    pub interchain_account_id: String,
+
+    // neutron to cosmoshub transfer channel id
+    pub cosmoshub_channel: String,
+
+    // address of community pool on cosmoshub we send funds to
+    pub cosmoshub_community_pool_address: String,
+
+    // IBC denom of neutron that was sent over our `cosmoshub_channel`
+    pub ibc_neutron_denom: String,
 }
 
 #[cw_serde]
