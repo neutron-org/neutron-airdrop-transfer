@@ -18,10 +18,13 @@ pub struct InstantiateMsg {
     pub cosmoshub_channel: String,
 
     // address of community pool on cosmoshub we send funds to
-    pub cosmoshub_community_pool_address: String,
+    pub hub_community_pool_address: String,
 
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
+
+    // cosmos-hub revision number; used for ibc timeout
+    pub hub_revision_number: u64,
 }
 
 #[cw_serde]
