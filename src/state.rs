@@ -21,7 +21,6 @@ pub struct Config {
     pub airdrop_address: Addr,
     pub interchain_account_id: String,
     pub channel_id_to_hub: String,
-    pub hub_community_pool_address: String,
     pub hub_revision_number: u64,
     pub ibc_neutron_denom: String,
 }

@@ -17,9 +17,6 @@ pub struct InstantiateMsg {
     // neutron to cosmoshub transfer channel id
     pub cosmoshub_channel: String,
 
-    // address of community pool on cosmoshub we send funds to
-    pub hub_community_pool_address: String,
-
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
 

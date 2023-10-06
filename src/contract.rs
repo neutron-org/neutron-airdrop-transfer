@@ -50,7 +50,6 @@ pub fn instantiate(
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             interchain_account_id: msg.interchain_account_id,
             channel_id_to_hub: msg.cosmoshub_channel,
-            hub_community_pool_address: msg.hub_community_pool_address,
             hub_revision_number: msg.hub_revision_number,
             ibc_neutron_denom: msg.ibc_neutron_denom,
         },

@@ -18,7 +18,10 @@
     "lint-fix": "eslint ./src --fix"
   },
   "dependencies": {
+    "@cosmjs/proto-signing": "^0.31.0",
+    "@cosmjs/stargate": "^0.31.0",
     "@iarna/toml": "^2.2.5",
+    "@neutron-org/tge-client": "^1.0.0",
     "commander": "^11.0.0",
     "docker-cli-js": "^2.10.0",
     "docker-compose": "^0.24.2",
