@@ -115,17 +115,33 @@ export async function AirdropTest(walletMnemonic: string): Promise<void> {
     const sendmoneyres = await cosmwasm.execute(instantiator, creditsAddress, {
         mint: {}
     }, 'auto', 'mint in credits', [coin(9000, "untrn")])
-    // console.log('sendmoneyres ' + JSON.stringify(sendmoneyres));
+    console.log('sendmoneyres ' + JSON.stringify(sendmoneyres));
 
     console.log('Step 1 - claiming money from airdrop -> credits -> airdrop -> reserve_address (claimerAddress)')
     const claimmoneyres = await cosmwasm.execute(instantiator, claimerAddress, {
         "claim_unclaimed": {},
     }, 'auto', 'mint in credits', [])
-    // console.log('claimmoneyres ' + JSON.stringify(claimmoneyres));
-
-
+    console.log('claimmoneyres ' + JSON.stringify(claimmoneyres));
 
     console.log('Step 1 check')
     const balance = await cosmwasm.getBalance(claimerAddress, 'untrn')
-    console.log('Balance of claimer account: ' + JSON.stringify(balance))
+    console.log('Balance of claimer account (should be 9000): ' + JSON.stringify(balance))
+
+    console.log('Step 2 - create hub ica')
+    const createhubicares = await cosmwasm.execute(instantiator, claimerAddress, {
+        "create_hub_ica": {},
+    }, 'auto', 'create hub ica', [])
+    console.log('createhubicares ' + JSON.stringify(createhubicares));
+
+    console.log('Step 3 - send claimed tokens to ica')
+    const sendtokenstoicares = await cosmwasm.execute(instantiator, claimerAddress, {
+        "send_claimed_tokens_to_ica": {},
+    }, 'auto', 'send tokens to ica', [])
+    console.log('sendtokenstoicares ' + JSON.stringify(sendtokenstoicares));
+
+    console.log('Step 4 - fund community pool')
+    const fundcommunitypoolres = await cosmwasm.execute(instantiator, claimerAddress, {
+        "fund_community_pool": {},
+    }, 'auto', 'fund community pool', [])
+    console.log('fundcommunitypoolres ' + JSON.stringify(fundcommunitypoolres));
 }

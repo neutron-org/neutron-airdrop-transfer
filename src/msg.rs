@@ -29,13 +29,20 @@ pub enum ExecuteMsg {
     ClaimUnclaimed {},
     CreateHubICA {},
     SendClaimedTokensToICA {},
-    SendTokensToCommunityPool {},
+    FundCommunityPool {},
     Done {},
 }
 
 #[cw_serde]
 #[derive(QueryResponses)]
-pub enum QueryMsg {}
+pub enum QueryMsg {
+    #[returns(crate::state::Stage)]
+    Stage {},
+    #[returns(Option<crate::state::InterchainAccount>)]
+    InterchainAccount {},
+    #[returns(cosmwasm_std::Uint128)]
+    TransferAmount {},
+}
 
 #[cw_serde]
 pub struct MigrateMsg {}

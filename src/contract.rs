@@ -74,8 +74,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env),
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env),
-        ExecuteMsg::SendClaimedTokensToICA {} => send_claimed_tokens_to_ica(deps, env),
-        ExecuteMsg::SendTokensToCommunityPool {} => send_tokens_to_community_pool(deps, env),
+        ExecuteMsg::SendClaimedTokensToICA {} => execute_send_claimed_tokens_to_ica(deps, env),
+        ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env),
         ExecuteMsg::Done {} => execute_done(),
     }
 }
@@ -86,8 +86,7 @@ fn execute_claim_unclaimed(
 ) -> NeutronResult<Response<NeutronMsg>> {
     STAGE.save(deps.storage, &ExecuteMsg::CreateHubICA {})?;
 
-    // TODO: do we have to calculate exact diff here?
-    // let before_amount = deps.querier.query_balance()?;
+    // let before_amount = deps.querier.query_balance(env.contract.address, NEUTRON_DENOM)?;
 
     let config = CONFIG.load(deps.storage)?;
 
@@ -116,11 +115,11 @@ fn execute_create_hub_ica(
     Ok(Response::default().add_message(register_ica))
 }
 
-fn send_claimed_tokens_to_ica(
+fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    STAGE.save(deps.storage, &ExecuteMsg::SendTokensToCommunityPool {})?;
+    STAGE.save(deps.storage, &ExecuteMsg::FundCommunityPool {})?;
 
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
@@ -150,7 +149,7 @@ fn send_claimed_tokens_to_ica(
     Ok(Response::default().add_message(send_msg))
 }
 
-fn send_tokens_to_community_pool(
+fn execute_fund_community_pool(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -210,8 +209,27 @@ fn execute_done() -> NeutronResult<Response<NeutronMsg>> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
-    unimplemented!()
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Stage {} => query_stage(deps),
+        QueryMsg::InterchainAccount {} => query_interchain_account(deps),
+        QueryMsg::TransferAmount {} => query_transfer_amount(deps),
+    }
+}
+
+fn query_transfer_amount(deps: Deps) -> StdResult<Binary> {
+    let amount = TRANSFER_AMOUNT.load(deps.storage)?;
+    to_binary(&amount)
+}
+
+fn query_interchain_account(deps: Deps) -> StdResult<Binary> {
+    let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?;
+    to_binary(&ica)
+}
+
+fn query_stage(deps: Deps) -> StdResult<Binary> {
+    let stage = STAGE.load(deps.storage)?;
+    to_binary(&stage)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
