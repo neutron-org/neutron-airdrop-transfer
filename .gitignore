@@ -15,4 +15,5 @@
 *.iml
 .idea
 
+# Built artifacts
 /artifacts
