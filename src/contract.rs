@@ -3,8 +3,8 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, SubMsg, WasmMsg,
+    to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    SubMsg, WasmMsg,
 };
 use cw2::set_contract_version;
 use prost::Message;
