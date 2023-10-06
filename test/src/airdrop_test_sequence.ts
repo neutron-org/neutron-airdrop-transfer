@@ -1,9 +1,10 @@
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
-import { AccountData, DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
-import { SigningStargateClient } from '@cosmjs/stargate';
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { Decimal } from "@cosmjs/math";
 import fs from 'fs';
 import {coin} from "@cosmjs/amino/build/coins";
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 export async function AirdropTest(walletMnemonic: string): Promise<void> {
     // prepare...
@@ -108,14 +109,14 @@ export async function AirdropTest(walletMnemonic: string): Promise<void> {
 
 
 
-
-
-
-    console.log('Sending money to the credits (mint)')
+    console.log('Prestep - Sending money to the credits (mint)')
     const sendmoneyres = await cosmwasm.execute(instantiator, creditsAddress, {
         mint: {}
     }, 'auto', 'mint in credits', [coin(9000, "untrn")])
     console.log('sendmoneyres ' + JSON.stringify(sendmoneyres));
+
+
+
 
     console.log('Step 1 - claiming money from airdrop -> credits -> airdrop -> reserve_address (claimerAddress)')
     const claimmoneyres = await cosmwasm.execute(instantiator, claimerAddress, {
@@ -123,25 +124,46 @@ export async function AirdropTest(walletMnemonic: string): Promise<void> {
     }, 'auto', 'mint in credits', [])
     console.log('claimmoneyres ' + JSON.stringify(claimmoneyres));
 
+    await delay(1000);
+
     console.log('Step 1 check')
     const balance = await cosmwasm.getBalance(claimerAddress, 'untrn')
     console.log('Balance of claimer account (should be 9000): ' + JSON.stringify(balance))
 
     console.log('Step 2 - create hub ica')
     const createhubicares = await cosmwasm.execute(instantiator, claimerAddress, {
-        "create_hub_ica": {},
+        create_hub_ica: {},
     }, 'auto', 'create hub ica', [])
-    console.log('createhubicares ' + JSON.stringify(createhubicares));
+    console.log('createhubicares ' + JSON.stringify(createhubicares))
+
+    await delay(30000);
+
+    console.log('Step 2 check')
+    // todo: wait for response? relayer one
+    const icaResponse = await cosmwasm.queryContractSmart(claimerAddress, { interchain_account: {} })
+    console.log('ICA address: ' + icaResponse)
 
     console.log('Step 3 - send claimed tokens to ica')
     const sendtokenstoicares = await cosmwasm.execute(instantiator, claimerAddress, {
-        "send_claimed_tokens_to_ica": {},
+        send_claimed_tokens_to_ica: {},
     }, 'auto', 'send tokens to ica', [])
     console.log('sendtokenstoicares ' + JSON.stringify(sendtokenstoicares));
 
+    await delay(30000);
+
+    console.log('Step 3 check')
+    const balanceAfter = await cosmwasm.getBalance(claimerAddress, 'untrn')
+    console.log('Balance of claimer account (should be 0): ' + JSON.stringify(balanceAfter))
+    console.log('Stage: ' + await cosmwasm.queryContractSmart(claimerAddress, { stage: {} }))
+
+
     console.log('Step 4 - fund community pool')
     const fundcommunitypoolres = await cosmwasm.execute(instantiator, claimerAddress, {
-        "fund_community_pool": {},
+        fund_community_pool: {},
     }, 'auto', 'fund community pool', [])
-    console.log('fundcommunitypoolres ' + JSON.stringify(fundcommunitypoolres));
+    console.log('fundcommunitypoolres ' + JSON.stringify(fundcommunitypoolres))
+
+    console.log('Step 4 check')
+    console.log('ICA address: ' + await cosmwasm.queryContractSmart(claimerAddress, { transfer_amount: {} }))
+    console.log('Stage: ' + await cosmwasm.queryContractSmart(claimerAddress, { stage: {} }))
 }

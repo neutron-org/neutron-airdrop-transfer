@@ -4,7 +4,7 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    SubMsg, WasmMsg,
+    WasmMsg,
 };
 use cw2::set_contract_version;
 use prost::Message;
@@ -32,7 +32,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
 const NEUTRON_DENOM: &str = "untrn";
 
-const SEND_TOKENS_TO_COMMUNITY_POOL_ID: u64 = 1;
+// const SEND_TOKENS_TO_COMMUNITY_POOL_ID: u64 = 1;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -196,10 +196,11 @@ fn execute_fund_community_pool(
         fee, // TODO: check
     );
 
-    let submsg = SubMsg::reply_on_success(cosmos_msg, SEND_TOKENS_TO_COMMUNITY_POOL_ID);
+    // let submsg = SubMsg::reply_on_success(cosmos_msg, SEND_TOKENS_TO_COMMUNITY_POOL_ID);
     // todo: reply handler? don't know if needed
 
-    Ok(Response::default().add_submessage(submsg))
+    // Ok(Response::default().add_submessage(submsg))
+    Ok(Response::default().add_message(cosmos_msg))
 }
 
 fn execute_done() -> NeutronResult<Response<NeutronMsg>> {
