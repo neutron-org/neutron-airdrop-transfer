@@ -8,9 +8,6 @@ pub struct InstantiateMsg {
     // airdrop contract address that we claim neutrons from
     pub airdrop_address: String,
 
-    // fee to register interchain transaction
-    // pub register_fee: Vec<CoinSDK>,
-
     // interchain account id we're creating (any string?)
     pub interchain_account_id: String,
 
