@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { program } from 'commander';
 import { SetupContracts } from "./setup";
-import {Connect} from "./connector";
-import {Step1} from "./step_1";
-import {Step2} from "./step_2";
-import {Step3} from "./step_3";
-import {Step4} from "./step_4";
+import { Connect } from "./connector";
+import { Step1 } from "./step_1";
+import { Step2 } from "./step_2";
+import { Step3 } from "./step_3";
+import { Step4 } from "./step_4";
 
 if (require.main === module) {
     program
@@ -13,9 +13,13 @@ if (require.main === module) {
         .command('setup_contracts')
         .argument('<wallet>', 'wallet mnemonic')
         .argument('<endpoint>', 'rpc endpoint')
-        .action(async (wallet, endpoint) => {
+        .argument('<connection_id>', 'connection id to hub')
+        .argument('<channel_id>', 'channel id to hub')
+        .argument('<ibc_neutron_denom>', 'ibc of untrn sent to cosmos over `channel_id`')
+        .argument('<hub_revision_number>', 'hub revision number')
+        .action(async (wallet, endpoint, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber) => {
             const connection = await Connect(wallet, endpoint)
-            await SetupContracts(connection);
+            await SetupContracts(connection, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber);
             console.log('🥳 Done');
         });
 

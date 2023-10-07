@@ -32,6 +32,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
 const NEUTRON_DENOM: &str = "untrn";
 
+const TRANSFER_PORT: &str = "transfer";
+
 // const SEND_TOKENS_TO_COMMUNITY_POOL_ID: u64 = 1;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -49,7 +51,7 @@ pub fn instantiate(
             connection_id: msg.connection_id,
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             interchain_account_id: msg.interchain_account_id,
-            channel_id_to_hub: msg.cosmoshub_channel,
+            channel_id_to_hub: msg.channel_id_to_hub,
             hub_revision_number: msg.hub_revision_number,
             ibc_neutron_denom: msg.ibc_neutron_denom,
         },
@@ -132,7 +134,7 @@ fn execute_send_claimed_tokens_to_ica(
     TRANSFER_AMOUNT.save(deps.storage, &withdrawn_neutron.amount)?;
 
     let send_msg = NeutronMsg::IbcTransfer {
-        source_port: "transfer".to_string(),
+        source_port: TRANSFER_PORT.to_string(),
         source_channel: config.channel_id_to_hub.to_string(),
         sender: env.contract.address.to_string(),
         receiver: ica.address,

@@ -12,7 +12,7 @@ pub struct InstantiateMsg {
     pub interchain_account_id: String,
 
     // neutron to cosmoshub transfer channel id
-    pub cosmoshub_channel: String,
+    pub channel_id_to_hub: String,
 
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,

@@ -14,9 +14,13 @@ if (require.main === module) {
         .command('setup_contracts')
         .argument('<wallet>', 'wallet mnemonic')
         .argument('<endpoint>', 'rpc endpoint')
-        .action(async (wallet, endpoint) => {
+        .argument('<connection_id>', 'connection id to hub')
+        .argument('<channel_id>', 'channel id to hub')
+        .argument('<ibc_neutron_denom>', 'ibc of untrn sent to cosmos over `channel_id`')
+        .argument('<hub_revision_number>', 'hub revision number')
+        .action(async (wallet, endpoint, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber) => {
         const connection = await (0, connector_1.Connect)(wallet, endpoint);
-        await (0, setup_1.SetupContracts)(connection);
+        await (0, setup_1.SetupContracts)(connection, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber);
         console.log('🥳 Done');
     });
     commander_1.program

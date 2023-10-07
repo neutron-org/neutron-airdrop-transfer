@@ -8,7 +8,6 @@ async function Step2(c, claimerAddress) {
     }, 'auto', 'create hub ica', []);
     console.log('createhubicares ' + JSON.stringify(createhubicares));
     console.log('Step 2 check');
-    // todo: wait for response? relayer one
     const icaResponse = await c.client.queryContractSmart(claimerAddress, { interchain_account: {} });
     console.log('ICA address: ' + icaResponse);
 }

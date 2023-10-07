@@ -3,3 +3,4 @@ docker-compose.yml
 contracts
 init-neutrond.sh
 test
+testnet.txt

@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SetupContracts = void 0;
 const fs_1 = __importDefault(require("fs"));
 const coins_1 = require("@cosmjs/amino/build/coins");
-async function SetupContracts(c) {
+async function SetupContracts(c, toHubConnectionId, toHubChannelId, ibcNeutronDenom, hubRevisionNumber) {
     console.log('Storing and instantiating credits contract...');
     const { codeId: creditsCodeId } = await c.client.upload(c.owner, fs_1.default.readFileSync('./contracts/credits.wasm'), 1.5);
     const creditsres = await c.client.instantiate(c.owner, creditsCodeId, {
@@ -42,12 +42,12 @@ async function SetupContracts(c) {
     console.log('Storing and instantiating claimer contract...');
     const { codeId: claimerCodeId } = await c.client.upload(c.owner, fs_1.default.readFileSync('../artifacts/neutron_airdrop_transfer-aarch64.wasm'), 1.5);
     const claimerres = await c.client.instantiate(c.owner, claimerCodeId, {
-        connection_id: 'connection-0',
+        connection_id: toHubConnectionId,
         airdrop_address: airdropAddress,
         interchain_account_id: 'neutron-funder',
-        cosmoshub_channel: 'channel-0',
-        ibc_neutron_denom: 'ibc/kekw',
-        hub_revision_number: 1,
+        channel_id_to_hub: toHubChannelId,
+        ibc_neutron_denom: ibcNeutronDenom,
+        hub_revision_number: +hubRevisionNumber,
     }, 'credits', 'auto');
     console.log('claimerres: ' + JSON.stringify(claimerres));
     const claimerAddress = claimerres.contractAddress;
@@ -65,6 +65,6 @@ async function SetupContracts(c) {
         airdropAddress,
         claimerAddress
     };
-    console.log(JSON.stringify('Result contracts:\n' + res + '\n\n'));
+    console.log('Result contracts:\n' + JSON.stringify(res) + '\n\n');
 }
 exports.SetupContracts = SetupContracts;
