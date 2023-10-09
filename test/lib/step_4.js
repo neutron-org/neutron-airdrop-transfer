@@ -7,8 +7,5 @@ async function Step4(c, claimerAddress) {
         fund_community_pool: {},
     }, 'auto', 'fund community pool', [{ amount: '8000', denom: 'untrn' }]);
     console.log('fundcommunitypoolres ' + JSON.stringify(fundcommunitypoolres));
-    console.log('Step 4 check');
-    console.log('ICA address: ' + await c.client.queryContractSmart(claimerAddress, { transfer_amount: {} }));
-    console.log('Stage: ' + JSON.stringify(await c.client.queryContractSmart(claimerAddress, { stage: {} })));
 }
 exports.Step4 = Step4;

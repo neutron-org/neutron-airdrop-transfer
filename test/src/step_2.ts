@@ -6,8 +6,4 @@ export async function Step2(c: Connection, claimerAddress: string): Promise<void
         create_hub_i_c_a: {},
     }, 'auto', 'create hub ica', [])
     console.log('createhubicares ' + JSON.stringify(createhubicares))
-
-    console.log('Step 2 check')
-    const icaResponse = await c.client.queryContractSmart(claimerAddress, { interchain_account: {} })
-    console.log('ICA address: ' + icaResponse)
 }
