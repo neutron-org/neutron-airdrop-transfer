@@ -4,7 +4,7 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg,
+    StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use prost::Message;
@@ -132,7 +132,7 @@ fn execute_send_claimed_tokens_to_ica(
         .querier
         .query_balance(env.contract.address.clone(), NEUTRON_DENOM)?;
 
-    let fee_from_msg = info
+    let fee_funds = info
         .funds
         .iter()
         .find(|c| c.denom == NEUTRON_DENOM)
@@ -144,14 +144,28 @@ fn execute_send_claimed_tokens_to_ica(
         .clone();
 
     let neutron_to_send = Coin::new(
-        (neutron_on_balance.amount - fee_from_msg.amount).u128(),
+        (neutron_on_balance.amount - fee_funds.amount).u128(),
         NEUTRON_DENOM,
     );
+    let ack_fee = fee_funds.amount / Uint128::new(2) + fee_funds.amount % Uint128::new(2);
+    let timeout_fee = fee_funds.amount / Uint128::new(2);
+    if ack_fee + timeout_fee != fee_funds.amount {
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "incorrect total fee calculated: {:?}",
+            ack_fee + timeout_fee
+        ))));
+    }
 
     let fee = IbcFee {
-        recv_fee: vec![Coin::new(0, "untrn")],
-        ack_fee: vec![fee_from_msg.clone()],
-        timeout_fee: vec![fee_from_msg],
+        recv_fee: vec![Coin::new(0, NEUTRON_DENOM)],
+        ack_fee: vec![Coin {
+            amount: ack_fee,
+            denom: NEUTRON_DENOM.to_string(),
+        }],
+        timeout_fee: vec![Coin {
+            amount: timeout_fee,
+            denom: NEUTRON_DENOM.to_string(),
+        }],
     };
 
     TRANSFER_AMOUNT.save(deps.storage, &neutron_to_send.amount)?;

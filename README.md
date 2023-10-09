@@ -17,21 +17,17 @@ hermes create channel --a-chain pion-1 --a-port transfer --b-port transfer --a-c
 // created "channel-189 <-> channel-3235" for testnet
 
 ## 2. setup contracts
-node ./lib/index.js setup_contracts "$MNEMONICS" "$ENDPOINT" "connection-120" "channel-189" "$IBC_DENOM" 1
+node ./lib/index.js setup_contracts "$MNEMONICS" "$ENDPOINT" "connection-120" "channel-189" "$IBC_DENOM"
 
 // Result contracts:
-// {
-//     "creditsAddress": "neutron1n9hd7zmacfx0v2azep9e0xzwq5ya3n3c326uvpsy9jg22hy0nftq67fccf",
-//     "airdropAddress": "neutron1rvjk7kd7la4n39pqnmz434nxcf2f5sejm84ghs4s8vqfrnejxmxqarcqkq",
-//     "claimerAddress": "neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s"
-// }
+// {"creditsAddress":"neutron10q0glxwhdn0mv29ggrzcwdy79e6gxv4046qxdjqgyvda5jh5jqfqfz85q7","airdropAddress":"neutron1u6pcnyzhjfz374pv6pudpt9l2gv4ydwkx86darsh9n70jksu0cys3wsnug","claimerAddress":"neutron1uwkmkxpnu9v7wvyxptgdpdhmadjxzxau5xgy2e76nx3flnpxv37ss09cny"}
 
 ## 3. run steps
-CLAIMER_ADDRESS="neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s"
+CLAIMER_ADDRESS="neutron1uwkmkxpnu9v7wvyxptgdpdhmadjxzxau5xgy2e76nx3flnpxv37ss09cny"
 
 node ./lib/index.js step_1 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
 node ./lib/index.js step_2 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
-//ICA address: {"port_id":"icacontroller-neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s.neutron-funder","address":"cosmos1jdk6z4lf22danu25cn0efp48qh4khzskkyfrp8cvyxh8qvntzwdslwfmm7","controller_connection_id":"connection-120"}
+ICA address: {"port_id":"icacontroller-neutron1uwkmkxpnu9v7wvyxptgdpdhmadjxzxau5xgy2e76nx3flnpxv37ss09cny.neutron-funder","address":"cosmos1ftcz03upaklszh7tmusl95qmmnmnknlyu4pa26a46vzzgq3y2fcshlp2cu","controller_connection_id":"connection-120"}
 
 node ./lib/index.js step_3 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
 node ./lib/index.js step_4 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
