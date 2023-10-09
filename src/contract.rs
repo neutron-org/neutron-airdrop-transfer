@@ -180,7 +180,7 @@ fn execute_send_claimed_tokens_to_ica(
             revision_number: None,
             revision_height: None,
         },
-        timeout_timestamp: 300000000000, // 300 seconds
+        timeout_timestamp: env.block.time.plus_seconds(600).nanos(),
         memo: "transfer unclaimed airdrop to Cosmos Hub".to_string(),
         fee,
     };
