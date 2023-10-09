@@ -63,7 +63,6 @@ async function AirdropTest(walletMnemonic) {
         interchain_account_id: 'neutron-funder',
         cosmoshub_channel: 'channel-0',
         ibc_neutron_denom: 'ibc/kekw',
-        hub_revision_number: 1,
     }, 'credits', 'auto');
     // console.log('claimerres: ' + JSON.stringify(claimerres))
     const claimerAddress = claimerres.contractAddress;

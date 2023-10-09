@@ -3,8 +3,8 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    WasmMsg,
+    to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
 use prost::Message;
@@ -34,8 +34,6 @@ const NEUTRON_DENOM: &str = "untrn";
 
 const TRANSFER_PORT: &str = "transfer";
 
-// const SEND_TOKENS_TO_COMMUNITY_POOL_ID: u64 = 1;
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -52,7 +50,6 @@ pub fn instantiate(
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             interchain_account_id: msg.interchain_account_id,
             channel_id_to_hub: msg.channel_id_to_hub,
-            hub_revision_number: msg.hub_revision_number,
             ibc_neutron_denom: msg.ibc_neutron_denom,
         },
     )?;
@@ -63,20 +60,23 @@ pub fn instantiate(
 pub fn execute(
     deps: DepsMut<NeutronQuery>,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let current_stage = STAGE.load(deps.storage)?;
     if current_stage != msg {
-        // TODO: save what stage should be in the error
-        // return Err(NeutronError::Std(ContractError::IncorrectStage {}));
-        return Err(NeutronError::Std(StdError::generic_err("incorrect stage")));
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "incorrect stage: {:?}",
+            current_stage
+        ))));
     }
 
     match msg {
         ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env),
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env),
-        ExecuteMsg::SendClaimedTokensToICA {} => execute_send_claimed_tokens_to_ica(deps, env),
+        ExecuteMsg::SendClaimedTokensToICA {} => {
+            execute_send_claimed_tokens_to_ica(deps, env, info)
+        }
         ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env),
         ExecuteMsg::Done {} => execute_done(),
     }
@@ -120,6 +120,7 @@ fn execute_create_hub_ica(
 fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
+    info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
     STAGE.save(deps.storage, &ExecuteMsg::FundCommunityPool {})?;
 
@@ -127,25 +128,47 @@ fn execute_send_claimed_tokens_to_ica(
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
         NeutronError::Std(StdError::generic_err("no ica created yet".to_string()))
     })?;
-    let withdrawn_neutron = deps
+    let neutron_on_balance = deps
         .querier
         .query_balance(env.contract.address.clone(), NEUTRON_DENOM)?;
 
-    TRANSFER_AMOUNT.save(deps.storage, &withdrawn_neutron.amount)?;
+    let fee_from_msg = info
+        .funds
+        .iter()
+        .find(|c| c.denom == NEUTRON_DENOM)
+        .ok_or_else(|| {
+            NeutronError::Std(StdError::generic_err(
+                "please send funds as a fee".to_string(),
+            ))
+        })?
+        .clone();
+
+    let neutron_to_send = Coin::new(
+        (neutron_on_balance.amount - fee_from_msg.amount).u128(),
+        NEUTRON_DENOM,
+    );
+
+    let fee = IbcFee {
+        recv_fee: vec![Coin::new(0, "untrn")],
+        ack_fee: vec![fee_from_msg.clone()],
+        timeout_fee: vec![fee_from_msg],
+    };
+
+    TRANSFER_AMOUNT.save(deps.storage, &neutron_to_send.amount)?;
 
     let send_msg = NeutronMsg::IbcTransfer {
         source_port: TRANSFER_PORT.to_string(),
         source_channel: config.channel_id_to_hub.to_string(),
         sender: env.contract.address.to_string(),
         receiver: ica.address,
-        token: withdrawn_neutron,
+        token: neutron_to_send,
         timeout_height: RequestPacketTimeoutHeight {
-            revision_number: Some(config.hub_revision_number),
-            revision_height: Some(DEFAULT_TIMEOUT_HEIGHT),
+            revision_number: None,
+            revision_height: None,
         },
-        timeout_timestamp: 0,
+        timeout_timestamp: 300000000000, // 300 seconds
         memo: "transfer unclaimed airdrop to Cosmos Hub".to_string(),
-        fee: min_ntrn_ibc_fee(deps.as_ref())?,
+        fee,
     };
 
     Ok(Response::default().add_message(send_msg))
@@ -161,11 +184,9 @@ fn execute_fund_community_pool(
         NeutronError::Std(StdError::generic_err("no ica address yet".to_string()))
     })?;
 
-    let amount = TRANSFER_AMOUNT.load(deps.storage)?;
-
     let amount = CosmosCoin {
         denom: config.ibc_neutron_denom.to_string(),
-        amount: amount.to_string(),
+        amount: TRANSFER_AMOUNT.load(deps.storage)?.to_string(),
     };
 
     let ica_msg = MsgFundCommunityPool {
@@ -195,13 +216,9 @@ fn execute_fund_community_pool(
         vec![any_msg],
         "fund community pool from neutron unclaimed airdrop".to_string(),
         DEFAULT_TIMEOUT_HEIGHT,
-        fee, // TODO: check
+        fee,
     );
 
-    // let submsg = SubMsg::reply_on_success(cosmos_msg, SEND_TOKENS_TO_COMMUNITY_POOL_ID);
-    // todo: reply handler? don't know if needed
-
-    // Ok(Response::default().add_submessage(submsg))
     Ok(Response::default().add_message(cosmos_msg))
 }
 

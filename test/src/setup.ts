@@ -2,7 +2,7 @@ import fs from 'fs';
 import {coin} from "@cosmjs/amino/build/coins";
 import {Connection} from "./connector";
 
-export async function SetupContracts(c: Connection, toHubConnectionId: string, toHubChannelId: string, ibcNeutronDenom: string, hubRevisionNumber: number): Promise<void> {
+export async function SetupContracts(c: Connection, toHubConnectionId: string, toHubChannelId: string, ibcNeutronDenom: string): Promise<void> {
     console.log('Storing and instantiating credits contract...')
     const { codeId: creditsCodeId } = await c.client.upload(
         c.owner,
@@ -59,7 +59,6 @@ export async function SetupContracts(c: Connection, toHubConnectionId: string, t
         interchain_account_id: 'neutron-funder',
         channel_id_to_hub: toHubChannelId, // neutron to cosmoshub transfer channel id
         ibc_neutron_denom: ibcNeutronDenom,
-        hub_revision_number: +hubRevisionNumber,
     }, 'credits','auto');
     console.log('claimerres: ' + JSON.stringify(claimerres))
     const claimerAddress = claimerres.contractAddress;

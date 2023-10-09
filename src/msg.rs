@@ -16,9 +16,6 @@ pub struct InstantiateMsg {
 
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
-
-    // cosmos-hub revision number; used for ibc timeout
-    pub hub_revision_number: u64,
 }
 
 #[cw_serde]

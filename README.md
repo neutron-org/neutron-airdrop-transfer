@@ -19,10 +19,24 @@ hermes create channel --a-chain pion-1 --a-port transfer --b-port transfer --a-c
 ## 2. setup contracts
 node ./lib/index.js setup_contracts "$MNEMONICS" "$ENDPOINT" "connection-120" "channel-189" "$IBC_DENOM" 1
 
+// Result contracts:
+// {
+//     "creditsAddress": "neutron1n9hd7zmacfx0v2azep9e0xzwq5ya3n3c326uvpsy9jg22hy0nftq67fccf",
+//     "airdropAddress": "neutron1rvjk7kd7la4n39pqnmz434nxcf2f5sejm84ghs4s8vqfrnejxmxqarcqkq",
+//     "claimerAddress": "neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s"
+// }
+
 ## 3. run steps
-CLAIMER_ADDRESS=""
+CLAIMER_ADDRESS="neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s"
 
 node ./lib/index.js step_1 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
 node ./lib/index.js step_2 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
+//ICA address: {"port_id":"icacontroller-neutron1pnwclfjh998gtetemyte7xkyfjqpkfa3guq9gfpdduuuu90txmysw6p49s.neutron-funder","address":"cosmos1jdk6z4lf22danu25cn0efp48qh4khzskkyfrp8cvyxh8qvntzwdslwfmm7","controller_connection_id":"connection-120"}
+
 node ./lib/index.js step_3 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
 node ./lib/index.js step_4 "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
+
+## query state
+node ./lib/index.js query_state "$MNEMONICS" "$ENDPOINT" "$CLAIMER_ADDRESS"
+
+should be 0 on account

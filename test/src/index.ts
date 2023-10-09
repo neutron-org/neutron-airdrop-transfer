@@ -9,6 +9,23 @@ import { Step4 } from "./step_4";
 
 if (require.main === module) {
     program
+        .name('query_state')
+        .command('query_state')
+        .argument('<wallet>', 'wallet mnemonic')
+        .argument('<endpoint>', 'rpc endpoint')
+        .argument('<claimer_address>', 'claimer contract address')
+        .action(async (wallet, endpoint, claimerAddress) => {
+            const connection = await Connect(wallet, endpoint)
+
+            try { console.log('ICA address: ' + JSON.stringify(await connection.client.queryContractSmart(claimerAddress, { interchain_account: {} }))) }
+            catch { console.log('No ica account') }
+            console.log('Stage: ' + JSON.stringify(await connection.client.queryContractSmart(claimerAddress, { stage: {} })))
+            try { console.log('TransferAmount: ' + await connection.client.queryContractSmart(claimerAddress, { transfer_amount: {} })) }
+            catch { console.log('No transfer amount')}
+            console.log('Contract balance: ' +  JSON.stringify(await connection.client.getBalance(claimerAddress, 'untrn')))
+        });
+
+    program
         .name('setup_contracts')
         .command('setup_contracts')
         .argument('<wallet>', 'wallet mnemonic')
@@ -16,10 +33,9 @@ if (require.main === module) {
         .argument('<connection_id>', 'connection id to hub')
         .argument('<channel_id>', 'channel id to hub')
         .argument('<ibc_neutron_denom>', 'ibc of untrn sent to cosmos over `channel_id`')
-        .argument('<hub_revision_number>', 'hub revision number')
-        .action(async (wallet, endpoint, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber) => {
+        .action(async (wallet, endpoint, connectionId, channelId, ibcNeutronDenom) => {
             const connection = await Connect(wallet, endpoint)
-            await SetupContracts(connection, connectionId, channelId, ibcNeutronDenom, hubRevisionNumber);
+            await SetupContracts(connection, connectionId, channelId, ibcNeutronDenom);
             console.log('🥳 Done');
         });
 

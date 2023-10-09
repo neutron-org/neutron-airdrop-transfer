@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SetupContracts = void 0;
 const fs_1 = __importDefault(require("fs"));
 const coins_1 = require("@cosmjs/amino/build/coins");
-async function SetupContracts(c, toHubConnectionId, toHubChannelId, ibcNeutronDenom, hubRevisionNumber) {
+async function SetupContracts(c, toHubConnectionId, toHubChannelId, ibcNeutronDenom) {
     console.log('Storing and instantiating credits contract...');
     const { codeId: creditsCodeId } = await c.client.upload(c.owner, fs_1.default.readFileSync('./contracts/credits.wasm'), 1.5);
     const creditsres = await c.client.instantiate(c.owner, creditsCodeId, {
@@ -47,7 +47,6 @@ async function SetupContracts(c, toHubConnectionId, toHubChannelId, ibcNeutronDe
         interchain_account_id: 'neutron-funder',
         channel_id_to_hub: toHubChannelId,
         ibc_neutron_denom: ibcNeutronDenom,
-        hub_revision_number: +hubRevisionNumber,
     }, 'credits', 'auto');
     console.log('claimerres: ' + JSON.stringify(claimerres));
     const claimerAddress = claimerres.contractAddress;
