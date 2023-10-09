@@ -14,7 +14,7 @@ use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::query::min_ibc_fee::query_min_ibc_fee;
-use neutron_sdk::sudo::msg::{RequestPacketTimeoutHeight, SudoMsg};
+use neutron_sdk::sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, SudoMsg};
 use neutron_sdk::{NeutronError, NeutronResult};
 
 use crate::error::ContractError;
@@ -288,8 +288,26 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
             counterparty_channel_id,
             counterparty_version,
         ),
+        SudoMsg::Error { request, details } => sudo_error(deps, request, details),
+        SudoMsg::Timeout { request } => sudo_timeout(deps, request),
         _ => Ok(Response::default()),
     }
+}
+
+fn sudo_error(deps: DepsMut, _request: RequestPacket, _details: String) -> StdResult<Response> {
+    let current_stage = STAGE.load(deps.storage)?;
+    let stage = previous_stage(current_stage)?;
+    STAGE.save(deps.storage, &stage)?;
+
+    Ok(Response::default())
+}
+
+fn sudo_timeout(deps: DepsMut, _request: RequestPacket) -> StdResult<Response> {
+    let current_stage = STAGE.load(deps.storage)?;
+    let stage = previous_stage(current_stage)?;
+    STAGE.save(deps.storage, &stage)?;
+
+    Ok(Response::default())
 }
 
 fn sudo_open_ack(
@@ -334,4 +352,26 @@ fn min_ntrn_ibc_fee(deps: Deps<NeutronQuery>) -> NeutronResult<IbcFee> {
             .filter(|a| a.denom == NEUTRON_DENOM)
             .collect(),
     })
+}
+
+fn previous_stage(stage: ExecuteMsg) -> StdResult<ExecuteMsg> {
+    let stages = [
+        ExecuteMsg::ClaimUnclaimed {},
+        ExecuteMsg::CreateHubICA {},
+        ExecuteMsg::SendClaimedTokensToICA {},
+        ExecuteMsg::FundCommunityPool {},
+        ExecuteMsg::Done {},
+    ];
+    let i = stages
+        .iter()
+        .position(|s| *s == stage)
+        .ok_or_else(|| StdError::generic_err(format!("Incorrect stage: {:?}", stage)))?;
+
+    if i == 0 {
+        return Err(StdError::generic_err(
+            "no previous stage for the first stage",
+        ));
+    }
+
+    Ok(stages[i - 1].clone())
 }
