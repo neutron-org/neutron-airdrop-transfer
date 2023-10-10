@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 

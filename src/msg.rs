@@ -8,9 +8,6 @@ pub struct InstantiateMsg {
     // airdrop contract address that we claim neutrons from
     pub airdrop_address: String,
 
-    // interchain account id we're creating (any string?)
-    pub interchain_account_id: String,
-
     // neutron to cosmoshub transfer channel id
     pub channel_id_to_hub: String,
 
@@ -20,11 +17,14 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
+    /// Step 1. Claim unclaimed airdrops and send them to this contract.
     ClaimUnclaimed {},
-    CreateHubICA {},
-    SendClaimedTokensToICA {},
-    FundCommunityPool {},
-    Done {},
+    /// Step 2. Requires ICA to be created. Send funds to ICA account.
+    SendClaimedTokensToICA { },
+    /// Step 3. Requires ICA to be created and open. Fund cosmoshub community pool with sent funds.
+    FundCommunityPool { },
+    /// Creates ICA. Can be called if ICA does not created or channel was closed.
+    CreateHubICA { },
 }
 
 #[cw_serde]
