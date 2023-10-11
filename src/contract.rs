@@ -40,8 +40,6 @@ const MSG_FUND_COMMUNITY_POOL: &str = "/cosmos.distribution.v1beta1.MsgFundCommu
 const SEND_TO_ICA_MEMO: &str = "transfer unclaimed airdrop to Cosmos Hub";
 const FUND_COMMUNITY_POOL_MEMO: &str = "fund community pool from neutron unclaimed airdrop";
 
-const TIMEOUT: u64 = 7200; // 2 hours
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -59,6 +57,8 @@ pub fn instantiate(
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             channel_id_to_hub: msg.channel_id_to_hub,
             ibc_neutron_denom: msg.ibc_neutron_denom,
+            transfer_timeout_seconds: msg.transfer_timeout_seconds,
+            ica_timeout_seconds: msg.ica_timeout_seconds,
         },
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
@@ -182,7 +182,11 @@ fn execute_send_claimed_tokens_to_ica(
             revision_number: None,
             revision_height: None,
         },
-        timeout_timestamp: env.block.time.plus_seconds(TIMEOUT).nanos(),
+        timeout_timestamp: env
+            .block
+            .time
+            .plus_seconds(config.transfer_timeout_seconds)
+            .nanos(),
         memo: SEND_TO_ICA_MEMO.to_string(),
         fee,
     };
@@ -241,7 +245,7 @@ fn execute_fund_community_pool(
         ICA_ID.to_string(),
         vec![any_msg],
         FUND_COMMUNITY_POOL_MEMO.to_string(),
-        TIMEOUT,
+        config.ica_timeout_seconds,
         fee,
     );
 

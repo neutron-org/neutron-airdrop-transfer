@@ -13,6 +13,12 @@ pub struct InstantiateMsg {
 
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
+
+    /// timeout for ibc transfer
+    pub transfer_timeout_seconds: u64,
+
+    /// timeout for ica transactions
+    pub ica_timeout_seconds: u64,
 }
 
 #[cw_serde]

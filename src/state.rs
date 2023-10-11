@@ -29,6 +29,8 @@ pub struct Config {
     pub airdrop_address: Addr,
     pub channel_id_to_hub: String,
     pub ibc_neutron_denom: String,
+    pub transfer_timeout_seconds: u64,
+    pub ica_timeout_seconds: u64,
 }
 
 #[cw_serde]
