@@ -17,14 +17,14 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
+    /// Creates ICA. Can be called if ICA is not created or channel was closed.
+    CreateHubICA {},
     /// Step 1. Claim unclaimed airdrops and send them to this contract.
     ClaimUnclaimed {},
     /// Step 2. Requires ICA to be created. Send funds to ICA account.
-    SendClaimedTokensToICA { },
+    SendClaimedTokensToICA {},
     /// Step 3. Requires ICA to be created and open. Fund cosmoshub community pool with sent funds.
-    FundCommunityPool { },
-    /// Creates ICA. Can be called if ICA does not created or channel was closed.
-    CreateHubICA { },
+    FundCommunityPool {},
 }
 
 #[cw_serde]

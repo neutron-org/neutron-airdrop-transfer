@@ -36,7 +36,6 @@ const NEUTRON_DENOM: &str = "untrn";
 const TRANSFER_PORT: &str = "transfer";
 
 const MSG_FUND_COMMUNITY_POOL: &str = "/cosmos.distribution.v1beta1.MsgFundCommunityPool";
-const MSG_IBC_TRANSFER: &str = "/ibc.applications.transfer.v2.FungibleTokenPacketData";
 
 const SEND_TO_ICA_MEMO: &str = "transfer unclaimed airdrop to Cosmos Hub";
 const FUND_COMMUNITY_POOL_MEMO: &str = "fund community pool from neutron unclaimed airdrop";
@@ -62,6 +61,7 @@ pub fn instantiate(
             ibc_neutron_denom: msg.ibc_neutron_denom,
         },
     )?;
+    INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
     Ok(Response::default())
@@ -83,24 +83,42 @@ pub fn execute(
     let current_stage = STAGE.load(deps.storage)?;
 
     match msg {
-        ExecuteMsg::ClaimUnclaimed {} => {
-            execute_claim_unclaimed(deps, env, current_stage)
-        }
-        ExecuteMsg::SendClaimedTokensToICA { } => {
+        ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
+        ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info, current_stage),
+        ExecuteMsg::SendClaimedTokensToICA {} => {
             execute_send_claimed_tokens_to_ica(deps, env, info, current_stage)
         }
-        ExecuteMsg::FundCommunityPool { } => {
+        ExecuteMsg::FundCommunityPool {} => {
             execute_fund_community_pool(deps, env, info, current_stage)
         }
-        ExecuteMsg::CreateHubICA { } => {
-            execute_create_hub_ica(deps, env)
-        }
     }
+}
+
+fn execute_create_hub_ica(
+    deps: DepsMut<NeutronQuery>,
+    _env: Env,
+    _info: MessageInfo,
+) -> NeutronResult<Response<NeutronMsg>> {
+    // return if ICA channel exists and opened
+    if INTERCHAIN_ACCOUNT.load(deps.storage)?.is_some() {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "ICA channel already exists and open",
+        )));
+    }
+
+    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
+
+    let config = CONFIG.load(deps.storage)?;
+    let register_ica =
+        NeutronMsg::register_interchain_account(config.connection_id, ICA_ID.to_string());
+
+    Ok(Response::default().add_message(register_ica))
 }
 
 fn execute_claim_unclaimed(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
+    _info: MessageInfo,
     current_stage: Stage,
 ) -> NeutronResult<Response<NeutronMsg>> {
     if current_stage != Stage::ClaimUnclaimed {
@@ -139,7 +157,9 @@ fn execute_send_claimed_tokens_to_ica(
 
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
-        NeutronError::Std(StdError::generic_err("no ica created yet".to_string()))
+        NeutronError::Std(StdError::generic_err(
+            "ica is not created or open".to_string(),
+        ))
     })?;
     let neutron_on_balance = deps
         .querier
@@ -185,7 +205,9 @@ fn execute_fund_community_pool(
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
-        NeutronError::Std(StdError::generic_err("no ica address yet".to_string()))
+        NeutronError::Std(StdError::generic_err(
+            "ica is not created or open".to_string(),
+        ))
     })?;
 
     let amount = CosmosCoin {
@@ -274,30 +296,34 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
         ),
         SudoMsg::Response { request, data } => sudo_response(deps, request, data),
         SudoMsg::Error { request, details } => sudo_error(deps, request, details),
-        SudoMsg::Timeout { request } => sudo_timeout(deps, request),
+        SudoMsg::Timeout { request } => sudo_timeout(deps, env, request),
         _ => Ok(Response::default()),
     }
 }
 
-fn sudo_response(deps: DepsMut, _request: RequestPacket, data: Binary) -> StdResult<Response> {
+fn sudo_response(deps: DepsMut, request: RequestPacket, data: Binary) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: sudo response");
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
-    let parsed_data = decode_acknowledgement_response(data)?;
-    for item in parsed_data {
-        let item_type = item.msg_type.as_str();
-        deps.api
-            .debug(&format!("WASMDEBUG: item_type = {}", item_type));
-        match item_type {
-            MSG_IBC_TRANSFER => {
-                STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
-            }
-            MSG_FUND_COMMUNITY_POOL => {
-                STAGE.save(deps.storage, &Stage::Done)?;
-            }
-            _ => {
-                // TODO: what to do?
-                continue;
+    let source_port = request
+        .source_port
+        .ok_or_else(|| StdError::generic_err("source_port not found"))?;
+    let is_transfer = source_port == TRANSFER_PORT;
+    if is_transfer {
+        STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
+    } else {
+        let parsed_data = decode_acknowledgement_response(data)?;
+        for item in parsed_data {
+            let item_type = item.msg_type.as_str();
+            deps.api
+                .debug(&format!("WASMDEBUG: item_type = {}", item_type));
+            match item_type {
+                MSG_FUND_COMMUNITY_POOL => {
+                    STAGE.save(deps.storage, &Stage::Done)?;
+                }
+                _ => {
+                    continue;
+                }
             }
         }
     }
@@ -311,46 +337,28 @@ fn sudo_error(deps: DepsMut, _request: RequestPacket, _details: String) -> StdRe
     Ok(Response::default())
 }
 
-fn sudo_timeout(deps: DepsMut, _request: RequestPacket) -> StdResult<Response> {
+// can be called by response of create ica, ibc transfer and fund community pool
+fn sudo_timeout(deps: DepsMut, _env: Env, request: RequestPacket) -> StdResult<Response> {
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
-    // TODO: if timeout happened on ICA -> ICA closes, we need to be able to reopen ica channel,
-    // but still be able to call sudo_timeout then
+    let source_port = request
+        .source_port
+        .ok_or_else(|| StdError::generic_err("source_port not found"))?;
 
-    // TODO: set opened to false if sent by ICA
-
-    Ok(Response::default())
-}
-
-fn execute_create_hub_ica(
-    deps: DepsMut<NeutronQuery>,
-    _env: Env,
-) -> NeutronResult<Response<NeutronMsg>> {
-    let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?;
-    // return if ICA channel exists and opened
-    match ica {
-        Some(InterchainAccount{ address: _, open: true }) => {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "ICA channel already exists and open",
-            ))));
+    // ICA transactions timeout closes the channel
+    if let Some(ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
+        if source_port == ica.source_port_id {
+            INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
         }
-        _ => {},
     }
 
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
-
-    let config = CONFIG.load(deps.storage)?;
-
-    let register_ica = NeutronMsg::register_interchain_account(config.connection_id, ICA_ID.to_string());
-
-    INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
-    Ok(Response::default().add_message(register_ica))
+    Ok(Response::default())
 }
 
 fn sudo_open_ack(
     deps: DepsMut,
     _env: Env,
-    _port_id: String,
+    port_id: String,
     _channel_id: String,
     _counterparty_channel_id: String,
     counterparty_version: String,
@@ -362,7 +370,7 @@ fn sudo_open_ack(
             deps.storage,
             &Some(InterchainAccount {
                 address: parsed_version.address,
-                open: true,
+                source_port_id: port_id, // TODO: is this the source port_id ?
             }),
         )?;
         STAGE.save(deps.storage, &Stage::SendClaimedTokensToICA)?;

@@ -33,10 +33,12 @@ pub struct Config {
 
 #[cw_serde]
 pub struct InterchainAccount {
+    // ica address on remote network
     pub address: String,
-    pub open: bool,
+    pub source_port_id: String,
 }
 
+// TODO: can we import it from library?
 #[cw_serde]
 pub struct OpenAckVersion {
     pub version: String,
