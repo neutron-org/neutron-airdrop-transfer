@@ -45,4 +45,10 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    /// timeout for ibc transfer
+    pub transfer_timeout_seconds: u64,
+
+    /// timeout for ica transactions
+    pub ica_timeout_seconds: u64,
+}

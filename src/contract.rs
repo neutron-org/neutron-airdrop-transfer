@@ -277,8 +277,18 @@ fn query_stage(deps: Deps) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let new_config = {
+        let mut config = CONFIG.load(deps.storage)?;
+        config.transfer_timeout_seconds = msg.transfer_timeout_seconds;
+        config.ica_timeout_seconds = msg.ica_timeout_seconds;
+        config
+    };
+    // this is only for testing purposes
+    CONFIG.save(deps.storage, &new_config)?;
+
     Ok(Response::default())
 }
 
