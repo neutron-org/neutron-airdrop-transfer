@@ -20,7 +20,7 @@ const networkConfigs = {
     binary: 'gaiad',
     chain_id: 'testgaia',
     denom: 'stake',
-    image: 'gaia-node:latest',
+    image: 'gaia-node',
     prefix: 'cosmos',
     validators: 1,
     validators_balance: '1000000000',
@@ -28,6 +28,9 @@ const networkConfigs = {
       'app_state.slashing.params.downtime_jail_duration': '10s',
       'app_state.slashing.params.signed_blocks_window': '10',
       'app_state.staking.params.validator_bond_factor': '10',
+      'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
+        '*',
+      ],
     },
     config_opts: {
       'rpc.laddr': 'tcp://0.0.0.0:26657',
@@ -46,6 +49,7 @@ const networkConfigs = {
     denom: 'untrn',
     image: 'neutron-node',
     prefix: 'neutron',
+    trace: true,
     type: 'ics',
     upload: [
       './artifacts/contracts',
@@ -55,6 +59,9 @@ const networkConfigs = {
     post_init: ['CHAINID=ntrntest CHAIN_DIR=/opt /opt/init-neutrond.sh'],
     genesis_opts: {
       'app_state.crisis.constant_fee.denom': 'untrn',
+      'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
+        '*',
+      ],
     },
     config_opts: {
       'consensus.timeout_commit': '1s',
