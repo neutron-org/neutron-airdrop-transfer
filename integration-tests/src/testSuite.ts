@@ -27,9 +27,9 @@ const networkConfigs = {
       'app_state.slashing.params.downtime_jail_duration': '10s',
       'app_state.slashing.params.signed_blocks_window': '10',
       'app_state.staking.params.validator_bond_factor': '10',
-      'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
-        '*',
-      ],
+      // 'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
+      //   '*',
+      // ],
     },
     config_opts: {
       'rpc.laddr': 'tcp://0.0.0.0:26657',
@@ -44,7 +44,7 @@ const networkConfigs = {
   },
   neutron: {
     binary: 'neutrond',
-    chain_id: 'ntrntest',
+    chain_id: 'test-1',
     denom: 'untrn',
     image: 'neutron-node',
     prefix: 'neutron',
@@ -55,7 +55,7 @@ const networkConfigs = {
       './artifacts/contracts_thirdparty',
       './artifacts/scripts/init-neutrond.sh',
     ],
-    post_init: ['CHAINID=ntrntest CHAIN_DIR=/opt /opt/init-neutrond.sh'],
+    post_init: ['CHAINID=test-1 CHAIN_DIR=/opt /opt/init-neutrond.sh'],
     genesis_opts: {
       'app_state.crisis.constant_fee.denom': 'untrn',
       'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [

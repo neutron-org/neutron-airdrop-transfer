@@ -3,18 +3,18 @@
   "networks": {
     "neutron": {
       "binary": "neutrond",
-      "chain_id": "nnn",
+      "chain_id": "test-1",
       "denom": "untrn",
       "image": "neutron-node",
       "prefix": "neutron",
       "type": "ics",
       "upload": [
-        ".,/artifacts/contracts",
-        ",./artifacts/contracts_thirdparty",
+        "./artifacts/contracts",
+        "./artifacts/contracts_thirdparty",
         "./artifacts/scripts/init-neutrond.sh"
       ],
       "post_init": [
-        "CHAINID=nnn CHAIN_DIR=/opt /opt/artifacts/init-neutrond.sh"
+        "CHAINID=test-1 CHAIN_DIR=/opt /opt/artifacts/init-neutrond.sh"
       ],
       "genesis_opts": {
         "app_state.crisis.constant_fee.denom": "untrn"
