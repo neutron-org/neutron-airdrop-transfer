@@ -2,8 +2,7 @@ import cosmopark, { CosmoparkConfig } from '@neutron-org/cosmopark';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { StargateClient } from '@cosmjs/stargate';
 import { Client as NeutronClient } from '@neutron-org/client-ts';
-
-const TIMEOUT = 40 * 1000;
+import {waitFor} from "./helpers/sleep";
 
 const keys = [
   'master',
@@ -203,38 +202,4 @@ export const setupPark = async (
     });
   }
   return instance;
-};
-
-export const sleep = async (ms: number): Promise<void> =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-
-export const waitFor = async (
-    fn: () => Promise<boolean>,
-    timeout: number = 10000,
-    interval: number = 600,
-): Promise<void> => {
-  const start = Date.now();
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    if (await fn()) {
-      break;
-    }
-    if (Date.now() - start > timeout) {
-      throw new Error('Timeout waiting for condition');
-    }
-    await sleep(interval);
-  }
-};
-
-import { AccountData } from '@cosmjs/proto-signing';
-
-export const getAccount = async (
-    mnemonic: string,
-    prefix: string,
-): Promise<AccountData> => {
-  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
-    prefix,
-  });
-  const accounts = await wallet.getAccounts();
-  return accounts[0];
 };

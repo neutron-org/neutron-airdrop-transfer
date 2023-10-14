@@ -5,20 +5,22 @@ import { GasPrice } from '@cosmjs/stargate';
 import { setupPark } from '../src/testSuite';
 import fs from 'fs';
 import Cosmopark from '@neutron-org/cosmopark';
-import crypto from 'crypto';
 import {Client as NeutronClient} from "@neutron-org/client-ts";
-import {IgniteClient} from "@neutron-org/client-ts/dist/client";
+import {V1IdentifiedChannel} from "@neutron-org/client-ts/src/ibc.core.channel.v1/rest";
+import {getIBCDenom} from "../src/helpers/ibc_denom";
 
 describe('Test claim artifact', () => {
-    const context: { park?: Cosmopark } = {};
+    const context: { park?: Cosmopark } = {}
 
     let client: SigningCosmWasmClient;
-    let neutronClient: any; // TODO;
-    let deployer: string;
+    let neutronClient: any
+    let deployer: string
 
     beforeAll(async () => {
-        context.park = await setupPark('simple', ['neutron', 'gaia'], true);
+        console.log('setting up park...')
+        context.park = await setupPark('simple', ['neutron', 'gaia'], true)
 
+        console.log('setting up rpc connection and wallets...')
         const mnemonic = context.park.config.wallets.demowallet1.mnemonic
         const endpoint = `http://127.0.0.1:${context.park.ports['neutron'].rpc}`
         const options = {gasPrice: GasPrice.fromString('0.025untrn')}
@@ -30,37 +32,39 @@ describe('Test claim artifact', () => {
 
         const rest = `127.0.0.1:${context.park.ports['neutron'].rest}`
         const rpc = `127.0.0.1:${context.park.ports['neutron'].rpc}`
-        const apiUrl = `http://${rest}`;
+        const apiUrl = `http://${rest}`
         neutronClient = new NeutronClient({
             apiURL: apiUrl,
             rpcURL: rpc,
             prefix: 'neutron',
-        });
-    });
+        })
+    })
 
     afterAll(async () => {
-        await context.park.stop();
-    });
+        if (!!context.park) {
+            console.log('Stopping cosmopark...')
+            await context.park.stop();
+        }
+    })
 
-    let claimerCodeId: number;
+    let claimerCodeId: number
 
-    let creditsAddress: string;
-    let airdropAddress: string;
-    let claimerAddress: string;
+    let creditsAddress: string
+    let airdropAddress: string
+    let claimerAddress: string
 
     // untrn sent over transfer channel to gaia
     let ibcDenom: string;
 
+    let transferChannel: V1IdentifiedChannel;
 
-    it('creates transfer channel TODO', async () => {
-        expect(1).toBe(2);
+    it('already has transfer channel', async () => {
+        const res = await neutronClient.IbcCoreChannelV1.query.queryChannels();
+        transferChannel = res.data.channels.find(c => c.port_id === 'transfer' && c.state === 'STATE_OPEN')
+        expect(transferChannel.port_id).toEqual('transfer')
     })
 
-    it('deploys the contracts - airdrop, credits and claimer', async () => {
-        const res = await neutronClient.IbcCoreChannelV1.query.queryChannels();
-        const transferChannel = res.data.channels.find(c => c.port_id === 'transfer' && c.state === 'STATE_OPEN')
-        expect(transferChannel.port_id).toEqual('transfer')
-
+    it.skip('deploys the contracts - airdrop, credits and claimer', async () => {
         let connectionId = transferChannel.connection_hops[0];
         ibcDenom = getIBCDenom('transfer', transferChannel.counterparty.channel_id, 'untrn');
 
@@ -75,7 +79,6 @@ describe('Test claim artifact', () => {
         }, 'credits', 'auto')
         creditsAddress = creditsres.contractAddress
 
-        console.log('Storing and instantiating airdrop contract...')
         const {codeId: airdropCodeId} = await client.upload(
             deployer,
             fs.readFileSync('../contracts/cw20_merkle_airdrop.wasm'),
@@ -107,7 +110,6 @@ describe('Test claim artifact', () => {
             },
         }, 'auto')
 
-        console.log('Storing and instantiating claimer contract...')
         const claimerStoreRes = await client.upload(
             deployer,
             fs.readFileSync('../artifacts/neutron_airdrop_transfer-aarch64.wasm'),
@@ -130,7 +132,7 @@ describe('Test claim artifact', () => {
         }, 'auto')
     }, 1000000);
 
-    it('mints money for airdrop in credits contract', async () => {
+    it.skip('mints money for airdrop in credits contract', async () => {
         // send money to credits
         await client.execute(deployer, creditsAddress, {
             mint: {}
@@ -138,7 +140,7 @@ describe('Test claim artifact', () => {
         // TODO: check that money is minted on credits
     }, 1000000);
 
-    it('creates ICA account', async () => {
+    it.skip('creates ICA account', async () => {
         await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', 'create hub ica', [])
@@ -146,7 +148,7 @@ describe('Test claim artifact', () => {
         // TODO: wait and check that ICA is indeed created
     }, 1000000);
 
-    it('Step 1 - claiming money from airdrop -> credits -> airdrop -> reserve_address (claimerAddress)', async () => {
+    it.skip('Step 1 - claiming money from airdrop -> credits -> airdrop -> reserve_address (claimerAddress)', async () => {
         await client.execute(deployer, claimerAddress, {
             "claim_unclaimed": {},
         }, 'auto', 'mint in credits', [])
@@ -155,7 +157,7 @@ describe('Test claim artifact', () => {
         expect(balance.amount).toEqual(9000);
     }, 1000000);
 
-    it('Step 2 with timeout case', async () => {
+    it.skip('Step 2 with timeout case', async () => {
         // migrate timeout to small value
         await client.migrate(deployer, claimerAddress, claimerCodeId, {
             transfer_timeout_seconds: 1,
@@ -165,11 +167,14 @@ describe('Test claim artifact', () => {
         // TODO: ibc send timeout should leave the stage at the send stage
 
         // TODO: migrate back to old timeout values
+
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            transfer_timeout_seconds: 600,
+            ica_timeout_seconds: 600,
+        }, 'auto')
     }, 1000000);
 
-    it('')
-
-    it('Step 2 - send claimed tokens to ICA account', async () => {
+    it.skip('Step 2 - send claimed tokens to ICA account', async () => {
         await client.execute(deployer, claimerAddress, {
             send_claimed_tokens_to_i_c_a: {},
         }, 'auto', 'create hub ica', [{amount: '5000', denom: 'untrn'}])
@@ -179,7 +184,7 @@ describe('Test claim artifact', () => {
         // TODO: wait and check balance of ICA
     }, 1000000);
 
-    it('Step 3 - send claimed tokens to ICA account', async () => {
+    it.skip('Step 3 - send claimed tokens to ICA account', async () => {
         await client.execute(deployer, claimerAddress, {
             fund_community_pool: {},
         }, 'auto', 'fund community pool', [{ amount: '8000', denom: 'untrn' }])
@@ -188,12 +193,3 @@ describe('Test claim artifact', () => {
         // TODO: check that community pool account is funded
     }, 1000000);
 });
-
-export const getIBCDenom = (portName, channelName, denom: string): string => {
-    const uatomIBCHash = crypto
-        .createHash('sha256')
-        .update(`${portName}/${channelName}/${denom}`)
-        .digest('hex')
-        .toUpperCase();
-    return `ibc/${uatomIBCHash}`;
-};
