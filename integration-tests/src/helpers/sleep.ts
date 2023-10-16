@@ -3,8 +3,8 @@ export const sleep = async (ms: number): Promise<void> =>
 
 export const waitFor = async (
     fn: () => Promise<boolean>,
-    timeout: number = 10000,
-    interval: number = 600,
+    timeoutMs: number = 10000,
+    intervalMs: number = 600,
 ): Promise<void> => {
     const start = Date.now();
     // eslint-disable-next-line no-constant-condition
@@ -12,18 +12,18 @@ export const waitFor = async (
         if (await fn()) {
             break;
         }
-        if (Date.now() - start > timeout) {
+        if (Date.now() - start > timeoutMs) {
             throw new Error('Timeout waiting for condition');
         }
-        await sleep(interval);
+        await sleep(intervalMs);
     }
 };
 
-export const waitResult = async<T> (
+export const waitForResult = async<T> (
     fn: () => Promise<T>,
     ready: (t: T) => boolean,
-    timeout: number = 10000,
-    interval: number = 600,
+    timeoutMs: number = 10000,
+    intervalMs: number = 600,
 ): Promise<T> => {
     const start = Date.now()
     let value: T
@@ -34,10 +34,10 @@ export const waitResult = async<T> (
         if (ready(value)) {
             break;
         }
-        if (Date.now() - start > timeout) {
+        if (Date.now() - start > timeoutMs) {
             throw new Error('Timeout waiting for condition')
         }
-        await sleep(interval)
+        await sleep(intervalMs)
     }
 
     return value

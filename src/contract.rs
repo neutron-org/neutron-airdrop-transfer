@@ -14,7 +14,7 @@ use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::decode_acknowledgement_response;
-use neutron_sdk::sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, SudoMsg};
+use neutron_sdk::sudo::msg::{RequestPacket, SudoMsg};
 use neutron_sdk::{NeutronError, NeutronResult};
 
 use crate::error::ContractError;
@@ -57,7 +57,7 @@ pub fn instantiate(
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             channel_id_to_hub: msg.channel_id_to_hub,
             ibc_neutron_denom: msg.ibc_neutron_denom,
-            transfer_timeout_seconds: msg.transfer_timeout_seconds,
+            transfer_timeout_height: msg.transfer_timeout_height,
             ica_timeout_seconds: msg.ica_timeout_seconds,
         },
     )?;
@@ -179,15 +179,8 @@ fn execute_send_claimed_tokens_to_ica(
         sender: env.contract.address.to_string(),
         receiver: ica.address,
         token: neutron_to_send,
-        timeout_height: RequestPacketTimeoutHeight {
-            revision_number: None,
-            revision_height: None,
-        },
-        timeout_timestamp: env
-            .block
-            .time
-            .plus_seconds(config.transfer_timeout_seconds)
-            .nanos(),
+        timeout_height: config.transfer_timeout_height,
+        timeout_timestamp: 0,
         memo: SEND_TO_ICA_MEMO.to_string(),
         fee,
     };
@@ -287,22 +280,6 @@ fn query_interchain_tx_in_progress(deps: Deps) -> StdResult<Binary> {
 fn query_ibc_callback_states(deps: Deps) -> StdResult<Binary> {
     let states = IBC_CALLBACK_STATES.load(deps.storage)?;
     to_binary(&states)
-}
-
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let new_config = {
-        let mut config = CONFIG.load(deps.storage)?;
-        config.transfer_timeout_seconds = msg.transfer_timeout_seconds;
-        config.ica_timeout_seconds = msg.ica_timeout_seconds;
-        config
-    };
-    // this is only for testing purposes
-    CONFIG.save(deps.storage, &new_config)?;
-
-    Ok(Response::default())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -473,4 +450,28 @@ fn save_ibc_callback_state(
     })?;
 
     Ok(())
+}
+
+// this is only for testing purposes
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let new_config = {
+        let mut config = CONFIG.load(deps.storage)?;
+        if let Some(transfer_timeout_height) = msg.transfer_timeout_height {
+            config.transfer_timeout_height = transfer_timeout_height;
+        }
+        if let Some(ica_timeout_seconds) = msg.ica_timeout_seconds {
+            config.ica_timeout_seconds = ica_timeout_seconds;
+        }
+        config
+    };
+    CONFIG.save(deps.storage, &new_config)?;
+
+    if let Some(transfer_amount) = msg.transfer_amount {
+        TRANSFER_AMOUNT.save(deps.storage, &transfer_amount)?;
+    }
+
+    Ok(Response::default())
 }

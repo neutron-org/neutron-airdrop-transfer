@@ -1,4 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::Uint128;
+use neutron_sdk::sudo::msg::RequestPacketTimeoutHeight;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -15,7 +17,7 @@ pub struct InstantiateMsg {
     pub ibc_neutron_denom: String,
 
     /// timeout for ibc transfer
-    pub transfer_timeout_seconds: u64,
+    pub transfer_timeout_height: RequestPacketTimeoutHeight,
 
     /// timeout for ica transactions
     pub ica_timeout_seconds: u64,
@@ -58,8 +60,11 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct MigrateMsg {
     /// timeout for ibc transfer
-    pub transfer_timeout_seconds: u64,
+    pub transfer_timeout_height: Option<RequestPacketTimeoutHeight>,
 
     /// timeout for ica transactions
-    pub ica_timeout_seconds: u64,
+    pub ica_timeout_seconds: Option<u64>,
+
+    /// fund community pool amount
+    pub transfer_amount: Option<Uint128>,
 }
