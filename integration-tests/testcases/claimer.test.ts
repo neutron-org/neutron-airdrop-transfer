@@ -8,7 +8,7 @@ import Cosmopark from '@neutron-org/cosmopark';
 import {Client as NeutronClient} from "@neutron-org/client-ts";
 import {V1IdentifiedChannel} from "@neutron-org/client-ts/src/ibc.core.channel.v1/rest";
 import {getIBCDenom} from "../src/helpers/ibc_denom";
-import {waitFor} from "../src/helpers/sleep";
+import {waitFor, waitResult} from "../src/helpers/sleep";
 import {GaiaClient} from "../src/helpers/gaia_client";
 
 describe('Test claim artifact', () => {
@@ -213,6 +213,11 @@ describe('Test claim artifact', () => {
         expect(ica).toBeTruthy()
         expect(ica.address).toBeTruthy()
 
+        const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+        expect(callbackStates).toBeDefined()
+        expect(callbackStates.length).toEqual(0)
+        expect(callbackStates[0]).toEqual('kek') // TODO: expect TIMEOUT structure
+
         await client.migrate(deployer, claimerAddress, claimerCodeId, {
             transfer_timeout_seconds: initialTimeout,
             ica_timeout_seconds: initialTimeout,
@@ -226,16 +231,15 @@ describe('Test claim artifact', () => {
         const balanceAfter = await client.getBalance(claimerAddress, 'untrn')
         expect(balanceAfter).toEqual(0);
 
-        await waitFor(async () => {
-            const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
-            const icaBalance = await hubClient.CosmosBankV1Beta1.query.queryBalance(ica.address, ibcDenom)
-
-            if (!!icaBalance) {
-                expect(icaBalance.amount).toEqual(9000);
-                return true;
-            }
-            return false;
-        })
+        // wait for balance to be present on hub ica
+        const icaBalance = await waitResult(
+            async () => {
+                const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
+                return await hubClient.CosmosBankV1Beta1.query.queryBalance(ica.address, ibcDenom)
+            },
+            (coin) => +coin.amount > 0,
+        )
+        expect(icaBalance.amount).toEqual('9000')
     }, 1000000)
 
     it.skip('Step 3 - send claimed tokens to ICA account', async () => {
