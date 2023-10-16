@@ -32,9 +32,9 @@ const networkConfigs = {
       // 'app_state.slashing.params.downtime_jail_duration': '10s',
       // 'app_state.slashing.params.signed_blocks_window': '10',
       // 'app_state.staking.params.validator_bond_factor': '10',
-      // 'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
-      //   '*',
-      // ],
+      'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
+        '*',
+      ],
     },
     config_opts: {
       'rpc.laddr': 'tcp://0.0.0.0:26657',

@@ -321,26 +321,17 @@ fn sudo_response(
 
     save_ibc_callback_state(
         deps.storage,
-        IbcCallbackState::Response(request, env.block.height),
+        IbcCallbackState::Response(request.clone(), env.block.height),
     )?;
 
-    let is_transfer = source_port == TRANSFER_PORT;
-    if is_transfer {
+    if source_port == TRANSFER_PORT {
         STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
-    } else {
-        let parsed_data = decode_acknowledgement_response(data)?;
-        for item in parsed_data {
-            let item_type = item.msg_type.as_str();
-            deps.api
-                .debug(&format!("WASMDEBUG: item_type = {}", item_type));
-            match item_type {
-                MSG_FUND_COMMUNITY_POOL => {
-                    STAGE.save(deps.storage, &Stage::Done)?;
-                }
-                _ => {
-                    continue;
-                }
-            }
+    }
+
+    // is ICA transaction
+    if let Some(ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
+        if source_port == ica.port_id {
+            STAGE.save(deps.storage, &Stage::Done)?;
         }
     }
 
@@ -378,7 +369,7 @@ fn sudo_timeout(deps: DepsMut, env: Env, request: RequestPacket) -> StdResult<Re
 
     // ICA transactions timeout closes the channel
     if let Some(ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
-        if source_port == ica.source_port_id {
+        if source_port == ica.port_id {
             INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
         }
     }
@@ -390,8 +381,8 @@ fn sudo_open_ack(
     deps: DepsMut,
     _env: Env,
     port_id: String,
-    _channel_id: String,
-    _counterparty_channel_id: String,
+    channel_id: String,
+    counterparty_channel_id: String,
     counterparty_version: String,
 ) -> StdResult<Response> {
     let parsed_version: Result<OpenAckVersion, _> =
@@ -401,7 +392,9 @@ fn sudo_open_ack(
             deps.storage,
             &Some(InterchainAccount {
                 address: parsed_version.address,
-                source_port_id: port_id,
+                port_id,
+                channel_id,
+                counterparty_channel_id,
             }),
         )?;
         INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;

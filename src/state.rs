@@ -41,7 +41,9 @@ pub struct Config {
 pub struct InterchainAccount {
     // ica address on remote network
     pub address: String,
-    pub source_port_id: String,
+    pub port_id: String,
+    pub channel_id: String,
+    pub counterparty_channel_id: String,
 }
 
 // TODO: can we import it from library?

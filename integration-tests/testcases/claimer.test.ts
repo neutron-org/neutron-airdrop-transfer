@@ -20,6 +20,17 @@ describe('Test claim artifact', () => {
     let hubClient: any
     let deployer: string
 
+    let claimerCodeId: number
+
+    let creditsAddress: string
+    let airdropAddress: string
+    let claimerAddress: string
+
+    // untrn sent over transfer channel to gaia
+    let ibcDenom: string;
+
+    let transferChannel: V1IdentifiedChannel;
+
     beforeAll(async () => {
         context.park = await setupPark('simple', ['neutron', 'gaia'], true)
 
@@ -34,39 +45,23 @@ describe('Test claim artifact', () => {
         const accounts = await wallet.getAccounts()
         deployer = accounts[0].address;
 
-        const neutronCl = new NeutronClient({
+        neutronClient = new NeutronClient({
             apiURL: `http://127.0.0.1:${context.park.ports['neutron'].rest}`,
             rpcURL: `127.0.0.1:${context.park.ports['neutron'].rpc}`,
             prefix: 'neutron',
         })
-        const hubCl = new GaiaClient({
+        hubClient = new GaiaClient({
             apiURL: `http://127.0.0.1:${context.park.ports['gaia'].rest}`,
             rpcURL: `127.0.0.1:${context.park.ports['gaia'].rpc}`,
             prefix: 'cosmos'
         })
-
-
-        neutronClient = neutronCl
-        hubClient = hubCl
     }, 1000000)
 
     afterAll(async () => {
-        if (!!context.park) {
-            console.log('Stopping cosmopark...')
+        if (context.park) {
             await context.park.stop();
         }
     })
-
-    let claimerCodeId: number
-
-    let creditsAddress: string
-    let airdropAddress: string
-    let claimerAddress: string
-
-    // untrn sent over transfer channel to gaia
-    let ibcDenom: string;
-
-    let transferChannel: V1IdentifiedChannel;
 
     it('already has transfer channel', async () => {
         const res = await neutronClient.IbcCoreChannelV1.query.queryChannels();
@@ -212,13 +207,11 @@ describe('Test claim artifact', () => {
         // wait until interchain tx is not in progress
         await waitFor(async () => {
             const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            console.log('iN progress: ' + inProgress);
             return !inProgress
         }, 500000)
 
         // expect stage to be the old one
         const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
-        console.log('stage should be sendClaimedTokensTOICA: ' + JSON.stringify(stage))
         expect(stage).toEqual('send_claimed_tokens_to_i_c_a')
 
         // // expect ica to be still present since timeout in IBC does not close ICA
@@ -230,7 +223,6 @@ describe('Test claim artifact', () => {
         const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
         expect(callbackStates).toBeDefined()
         expect(callbackStates.length).toEqual(1)
-        console.log('timeout: ' + JSON.stringify(callbackStates[0]))
         expect(callbackStates[0].timeout[0].source_port).toEqual('transfer');
 
         // return back old values
@@ -243,11 +235,9 @@ describe('Test claim artifact', () => {
     }, 1000000)
 
     it('step 2 - send claimed tokens to ICA account', async () => {
-        console.log('before sending')
         await client.execute(deployer, claimerAddress, {
             send_claimed_tokens_to_i_c_a: {},
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
-        console.log('after sending')
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
@@ -261,9 +251,7 @@ describe('Test claim artifact', () => {
 
         // wait for balance to be present on hub ica
         const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
-        console.log('before querying balance: ' + ica.address)
         const icaBalance = await hubClient.CosmosBankV1Beta1.query.queryBalance(ica.address, { denom: ibcDenom })
-        console.log('after querying balance')
         // 9000 initially + refunded 2500 from ack fee in step 2 = 11500
         expect(icaBalance.data.balance.amount).toEqual('11500')
 
@@ -308,8 +296,7 @@ describe('Test claim artifact', () => {
         const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
         expect(callbackStates.length).toEqual(3)
         expect(callbackStates[2].timeout[0].sequence).toEqual(1)
-        console.log('response: ' + JSON.stringify(callbackStates[2].timeout))
-        expect(callbackStates[2].timeout[0].source_port).toEqual(ica.source_port_id);
+        expect(callbackStates[2].timeout[0].source_port).toEqual(ica.port_id);
 
         // ICA is removed
         const icaAfter = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
@@ -336,6 +323,7 @@ describe('Test claim artifact', () => {
         expect(stage).toEqual('fund_community_pool')
     })
 
+    // TODO: can use allowed/not allowed params? that's complex tho cause need to change params on gaia
     it.skip('step 3 with error - fund community pool', async () => {
         // TODO: change transfer amount to bigger value (15000)
 
@@ -355,7 +343,7 @@ describe('Test claim artifact', () => {
     it('step 3 - fund community pool', async () => {
         await client.execute(deployer, claimerAddress, {
             fund_community_pool: {},
-        }, 'auto', 'fund community pool', [{ amount: '8000', denom: 'untrn' }])
+        }, 'auto', '', [{ amount: '8000', denom: 'untrn' }])
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
@@ -363,20 +351,22 @@ describe('Test claim artifact', () => {
             return !inProgress
         }, 500000)
 
-        // await stage to be 'done'
+        // should return callback
+        const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
+        const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+        expect(callbackStates[3].response[0].source_port).toEqual(ica.port_id)
+
+        // stage should be 'done'
         const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
         expect(stage).toEqual('done')
 
-        // expect balance to be 0 on ICA
-        const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
+        // expect balance to be 0 on ICA after funding
         const icaBalance = await hubClient.CosmosBankV1Beta1.query.queryBalance(ica.address, { denom: ibcDenom })
-        console.log('after querying balance')
-        // 9000 initially + refunded 2500 from ack fee in step 2 = 11500
         expect(icaBalance.data.balance.amount).toEqual('0')
 
-        // TODO: check that community pool account is funded
+        // expect community pool to have transferred funds
         const moduleAccountResponse = await hubClient.CosmosAuthV1Beta1.query.queryModuleAccountByName('distribution')
-        const moduleAccount = ModuleAccount.fromJSON(moduleAccountResponse.data.account).baseAccount.address
+        const moduleAccount = moduleAccountResponse.data.account.base_account.address
         const icaBalanceInPool = await hubClient.CosmosBankV1Beta1.query.queryBalance(moduleAccount, { denom: ibcDenom })
         expect(icaBalanceInPool.data.balance.amount).toEqual('11500')
     }, 1000000)
