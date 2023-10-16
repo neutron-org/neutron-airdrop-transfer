@@ -17,10 +17,8 @@ describe('Test claim artifact', () => {
     let deployer: string
 
     beforeAll(async () => {
-        console.log('setting up park...')
         context.park = await setupPark('simple', ['neutron', 'gaia'], true)
 
-        console.log('setting up rpc connection and wallets...')
         const mnemonic = context.park.config.wallets.demowallet1.mnemonic
         const endpoint = `http://127.0.0.1:${context.park.ports['neutron'].rpc}`
         const options = {gasPrice: GasPrice.fromString('0.025untrn')}
@@ -38,7 +36,7 @@ describe('Test claim artifact', () => {
             rpcURL: rpc,
             prefix: 'neutron',
         })
-    })
+    }, 1000000)
 
     afterAll(async () => {
         if (!!context.park) {
@@ -61,16 +59,17 @@ describe('Test claim artifact', () => {
     it('already has transfer channel', async () => {
         const res = await neutronClient.IbcCoreChannelV1.query.queryChannels();
         transferChannel = res.data.channels.find(c => c.port_id === 'transfer' && c.state === 'STATE_OPEN')
+        expect(transferChannel).toBeDefined()
         expect(transferChannel.port_id).toEqual('transfer')
     })
 
-    it.skip('deploys the contracts - airdrop, credits and claimer', async () => {
+    it('deploys the contracts - airdrop, credits and claimer', async () => {
         let connectionId = transferChannel.connection_hops[0];
         ibcDenom = getIBCDenom('transfer', transferChannel.counterparty.channel_id, 'untrn');
 
         const {codeId: creditsCodeId} = await client.upload(
             deployer,
-            fs.readFileSync('../contracts/credits.wasm'),
+            fs.readFileSync('../artifacts/credits.wasm'),
             1.5,
         )
         expect(creditsCodeId).toBeGreaterThan(0)
@@ -81,7 +80,7 @@ describe('Test claim artifact', () => {
 
         const {codeId: airdropCodeId} = await client.upload(
             deployer,
-            fs.readFileSync('../contracts/cw20_merkle_airdrop.wasm'),
+            fs.readFileSync('../artifacts/cw20_merkle_airdrop.wasm'),
             1.5,
         )
         expect(airdropCodeId).toBeGreaterThan(0)
@@ -112,7 +111,7 @@ describe('Test claim artifact', () => {
 
         const claimerStoreRes = await client.upload(
             deployer,
-            fs.readFileSync('../artifacts/neutron_airdrop_transfer-aarch64.wasm'),
+            fs.readFileSync('../../artifacts/neutron_airdrop_transfer-aarch64.wasm'),
             1.5,
         )
         claimerCodeId = claimerStoreRes.codeId;

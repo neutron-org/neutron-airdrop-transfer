@@ -3,6 +3,7 @@ import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { StargateClient } from '@cosmjs/stargate';
 import { Client as NeutronClient } from '@neutron-org/client-ts';
 import {waitFor} from "./helpers/sleep";
+import { Tendermint34Client } from '@cosmjs/tendermint-rpc';
 
 const keys = [
   'master',
@@ -17,16 +18,20 @@ const keys = [
 const networkConfigs = {
   gaia: {
     binary: 'gaiad',
-    chain_id: 'testgaia',
-    denom: 'stake',
+    chain_id: 'testgaia-1',
+    denom: 'uatom',
     image: 'gaia-node',
     prefix: 'cosmos',
     validators: 1,
     validators_balance: '1000000000',
     genesis_opts: {
-      'app_state.slashing.params.downtime_jail_duration': '10s',
-      'app_state.slashing.params.signed_blocks_window': '10',
-      'app_state.staking.params.validator_bond_factor': '10',
+      // 'app_state.staking.params.denom': 'uatom',
+      // 'app_state.staking.params.mint_denom': 'uatom',
+      'app_state.staking.params.bond_denom': 'uatom',
+
+      // 'app_state.slashing.params.downtime_jail_duration': '10s',
+      // 'app_state.slashing.params.signed_blocks_window': '10',
+      // 'app_state.staking.params.validator_bond_factor': '10',
       // 'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
       //   '*',
       // ],
@@ -38,13 +43,13 @@ const networkConfigs = {
       'api.enable': true,
       'api.swagger': true,
       'grpc.enable': true,
-      'minimum-gas-prices': '0stake',
+      'minimum-gas-prices': '0uatom',
       'rosetta.enable': true,
     },
   },
   neutron: {
     binary: 'neutrond',
-    chain_id: 'test-1',
+    chain_id: 'testneutron-1',
     denom: 'untrn',
     image: 'neutron-node',
     prefix: 'neutron',
@@ -55,7 +60,7 @@ const networkConfigs = {
       './artifacts/contracts_thirdparty',
       './artifacts/scripts/init-neutrond.sh',
     ],
-    post_init: ['CHAINID=test-1 CHAIN_DIR=/opt /opt/init-neutrond.sh'],
+    post_init: ['CHAINID=testneutron-1 CHAIN_DIR=/opt /opt/init-neutrond.sh'],
     genesis_opts: {
       'app_state.crisis.constant_fee.denom': 'untrn',
       'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
@@ -104,12 +109,18 @@ type Keys = (typeof keys)[number];
 const awaitFirstBlock = async (rpc: string): Promise<void> =>
     waitFor(async () => {
       try {
-        const client = await StargateClient.connect(rpc);
+        const tendermintClient = await Tendermint34Client.connect(rpc);
+        const client= await StargateClient.create(tendermintClient);
+
+        // const client = await StargateClient.connect(rpc);
         const block = await client.getBlock();
+        // console.log('block: ' + block.id)
         if (block.header.height > 1) {
+          // console.log(`First block found for ${rpc}`)
           return true;
         }
       } catch (e) {
+        // console.log(`Exception trying to find block for ${rpc}. Error: ${e.stack}`)
         return false;
       }
     }, 20_000);
@@ -124,9 +135,13 @@ const awaitNeutronChannels = async (rest: string, rpc: string): Promise<void> =>
         });
         const res = await client.IbcCoreChannelV1.query.queryChannels();
         if (res.data.channels.length > 0) {
-          return true;
+          let channels = res.data.channels;
+          if (channels.every((c) => c.state === 'STATE_OPEN')) {
+            return true;
+          }
         }
       } catch (e) {
+        console.log('failed to find channels: ' + e.message)
         return false;
       }
     }, 60_000);
@@ -156,10 +171,7 @@ export const setupPark = async (
     master_mnemonic: wallets.master,
     multicontext: true,
     wallets: {
-      demowallet1: {
-        mnemonic: wallets.demowallet1,
-        balance: '1000000000',
-      },
+      demowallet1: { mnemonic: wallets.demowallet1, balance: '1000000000' },
       demo1: { mnemonic: wallets.demo1, balance: '1000000000' },
       demo2: { mnemonic: wallets.demo2, balance: '1000000000' },
       demo3: { mnemonic: wallets.demo3, balance: '1000000000' },
@@ -184,20 +196,24 @@ export const setupPark = async (
     ];
   }
   const instance = await cosmopark.create(config);
+  // console.log('instance created')
   await Promise.all(
-      Object.entries(instance.ports).map(([network, ports]) =>
-          awaitFirstBlock(`127.0.0.1:${ports.rpc}`).catch((e) => {
-            console.log(`Failed to await first block for ${network}: ${e}`);
-            throw e;
-          }),
+      Object.entries(instance.ports).map(([network, ports]) => {
+            // console.log(`await first block: ${ports.rpc}`);
+            return awaitFirstBlock(`127.0.0.1:${ports.rpc}`).catch((e) => {
+              console.log(`Failed to await first block for ${network}: ${e}`);
+              throw e;
+            })
+          }
       ),
   );
+  // console.log('all first blocks found')
   if (needRelayers) {
     await awaitNeutronChannels(
         `127.0.0.1:${instance.ports['neutron'].rest}`,
         `127.0.0.1:${instance.ports['neutron'].rpc}`,
     ).catch((e) => {
-      console.log(`Failed to await neutron channels: ${e}`);
+      // console.log(`Failed to await neutron channels: ${e}`);
       throw e;
     });
   }

@@ -2,11 +2,11 @@
 set -e
 
 BINARY=${BINARY:-neutrond}
-BASE_DIR=./data
+CHAIN_DIR=${CHAIN_DIR:-/opt/neutron}
 CHAINID=${CHAINID:-test-1}
 STAKEDENOM=${STAKEDENOM:-untrn}
-CONTRACTS_BINARIES_DIR=${CONTRACTS_BINARIES_DIR:-./contracts}
-THIRD_PARTY_CONTRACTS_DIR=${THIRD_PARTY_CONTRACTS_DIR:-./contracts_thirdparty}
+CONTRACTS_BINARIES_DIR=${CONTRACTS_BINARIES_DIR:-/opt/contracts}
+THIRD_PARTY_CONTRACTS_DIR=${THIRD_PARTY_CONTRACTS_DIR:-/opt/contracts_thirdparty}
 
 # IMPORTANT! minimum_gas_prices should always contain at least one record, otherwise the chain will not start or halt
 # ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2 denom is required by intgration tests (test:tokenomics)
@@ -14,11 +14,9 @@ MIN_GAS_PRICES_DEFAULT='[{"denom":"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEA
 MIN_GAS_PRICES=${MIN_GAS_PRICES:-"$MIN_GAS_PRICES_DEFAULT"}
 
 
-CHAIN_DIR="$BASE_DIR/$CHAINID"
 GENESIS_PATH="$CHAIN_DIR/config/genesis.json"
 
 ADMIN_ADDRESS=$($BINARY keys show demowallet1 -a --home "$CHAIN_DIR" --keyring-backend test)
-SECOND_MULTISIG_ADDRESS=$($BINARY keys show demowallet2 -a --home "$CHAIN_DIR" --keyring-backend test)
 # MAIN_DAO
 DAO_CONTRACT=$CONTRACTS_BINARIES_DIR/cwd_core.wasm
 PRE_PROPOSAL_CONTRACT=$CONTRACTS_BINARIES_DIR/cwd_pre_propose_single.wasm
@@ -43,8 +41,6 @@ SUBDAO_PROPOSAL_CONTRACT=$CONTRACTS_BINARIES_DIR/cwd_subdao_proposal_single.wasm
 CW4_VOTING_CONTRACT=$THIRD_PARTY_CONTRACTS_DIR/cw4_voting.wasm
 CW4_GROUP_CONTRACT=$THIRD_PARTY_CONTRACTS_DIR/cw4_group.wasm
 
-echo "Add consumer section..."
-$BINARY add-consumer-section --home "$CHAIN_DIR"
 ### PARAMETERS SECTION
 
 ## slashing params
@@ -444,10 +440,6 @@ CW4_VOTE_INIT_MSG='{
     {
       "addr": "'"$ADMIN_ADDRESS"'",
       "weight": 1
-    },
-    {
-      "addr": "'"$SECOND_MULTISIG_ADDRESS"'",
-      "weight": 1
     }
   ]
 }'
@@ -690,15 +682,18 @@ set_genesis_param treasury_address            "\"$DAO_CONTRACT_ADDRESS\""       
 set_genesis_param fee_collector_address       "\"$DAO_CONTRACT_ADDRESS\""                   # tokenfactory
 set_genesis_param security_address            "\"$SECURITY_SUBDAO_CORE_CONTRACT_ADDRESS\"," # cron
 set_genesis_param limit                       5                                             # cron
-set_genesis_param allow_messages              "[\"*\"]"                                     # interchainaccounts
-set_genesis_param signed_blocks_window        "\"$SLASHING_SIGNED_BLOCKS_WINDOW\","         # slashing
-set_genesis_param min_signed_per_window       "\"$SLASHING_MIN_SIGNED\","                   # slashing
-set_genesis_param slash_fraction_double_sign  "\"$SLASHING_FRACTION_DOUBLE_SIGN\","         # slashing
-set_genesis_param slash_fraction_downtime     "\"$SLASHING_FRACTION_DOWNTIME\""             # slashing
+#set_genesis_param allow_messages              "[\"*\"]"                                     # interchainaccounts
+
+#set_genesis_param signed_blocks_window        "\"$SLASHING_SIGNED_BLOCKS_WINDOW\","         # slashing
+#set_genesis_param min_signed_per_window       "\"$SLASHING_MIN_SIGNED\","                   # slashing
+#set_genesis_param slash_fraction_double_sign  "\"$SLASHING_FRACTION_DOUBLE_SIGN\","         # slashing
+#set_genesis_param slash_fraction_downtime     "\"$SLASHING_FRACTION_DOWNTIME\""             # slashing
 set_genesis_param minimum_gas_prices          "$MIN_GAS_PRICES"                             # globalfee
 
 if ! jq -e . "$GENESIS_PATH" >/dev/null 2>&1; then
     echo "genesis appears to become incorrect json" >&2
+#    echo $(cat "$GENESIS_PATH") >&2
+#    jq -e . "$GENESIS_PATH" >/dev/null 2>&1;
     exit 1
 fi
 
