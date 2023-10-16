@@ -1,6 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::Item;
+use neutron_sdk::sudo::msg::RequestPacket;
 
 #[cw_serde]
 pub enum Stage {
@@ -22,6 +23,9 @@ pub const TRANSFER_AMOUNT: Item<Uint128> = Item::new("transfer_amount");
 
 // if true, interchain operation is in progress and we cannot make an operation
 pub const INTERCHAIN_TX_IN_PROGRESS: Item<bool> = Item::new("interchain_tx_in_progress");
+
+// to understand what happened with IBC calls
+pub const IBC_CALLBACK_STATES: Item<Vec<IbcCallbackState>> = Item::new("ibc_callback_states");
 
 #[cw_serde]
 pub struct Config {
@@ -49,4 +53,11 @@ pub struct OpenAckVersion {
     pub address: String,
     pub encoding: String,
     pub tx_type: String,
+}
+
+#[cw_serde]
+pub enum IbcCallbackState {
+    Response(RequestPacket, u64),      // request_packet, block_height
+    Timeout(RequestPacket, u64),       // request_packet, block_height
+    Error(RequestPacket, String, u64), // error with request_packet, details, block_height
 }

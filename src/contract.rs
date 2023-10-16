@@ -4,7 +4,7 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128, WasmMsg,
+    StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use prost::Message;
@@ -21,8 +21,8 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::outer::cw20_merkle_airdrop;
 use crate::state::{
-    Config, InterchainAccount, OpenAckVersion, Stage, CONFIG, INTERCHAIN_ACCOUNT,
-    INTERCHAIN_TX_IN_PROGRESS, STAGE, TRANSFER_AMOUNT,
+    Config, IbcCallbackState, InterchainAccount, OpenAckVersion, Stage, CONFIG,
+    IBC_CALLBACK_STATES, INTERCHAIN_ACCOUNT, INTERCHAIN_TX_IN_PROGRESS, STAGE, TRANSFER_AMOUNT,
 };
 
 const ICA_ID: &str = "funder";
@@ -63,6 +63,7 @@ pub fn instantiate(
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
+    IBC_CALLBACK_STATES.save(deps.storage, &vec![])?;
 
     Ok(Response::default())
 }
@@ -258,6 +259,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Stage {} => query_stage(deps),
         QueryMsg::InterchainAccount {} => query_interchain_account(deps),
         QueryMsg::TransferAmount {} => query_transfer_amount(deps),
+        QueryMsg::InterchainTxInProgress {} => query_interchain_tx_in_progress(deps),
+        QueryMsg::IbcCallbackStates {} => query_ibc_callback_states(deps),
     }
 }
 
@@ -274,6 +277,16 @@ fn query_interchain_account(deps: Deps) -> StdResult<Binary> {
 fn query_stage(deps: Deps) -> StdResult<Binary> {
     let stage = STAGE.load(deps.storage)?;
     to_binary(&stage)
+}
+
+fn query_interchain_tx_in_progress(deps: Deps) -> StdResult<Binary> {
+    let ica_in_progress = INTERCHAIN_TX_IN_PROGRESS.load(deps.storage)?;
+    to_binary(&ica_in_progress)
+}
+
+fn query_ibc_callback_states(deps: Deps) -> StdResult<Binary> {
+    let states = IBC_CALLBACK_STATES.load(deps.storage)?;
+    to_binary(&states)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -308,20 +321,32 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
             counterparty_channel_id,
             counterparty_version,
         ),
-        SudoMsg::Response { request, data } => sudo_response(deps, request, data),
-        SudoMsg::Error { request, details } => sudo_error(deps, request, details),
+        SudoMsg::Response { request, data } => sudo_response(deps, env, request, data),
+        SudoMsg::Error { request, details } => sudo_error(deps, env, request, details),
         SudoMsg::Timeout { request } => sudo_timeout(deps, env, request),
         _ => Ok(Response::default()),
     }
 }
 
-fn sudo_response(deps: DepsMut, request: RequestPacket, data: Binary) -> StdResult<Response> {
+fn sudo_response(
+    deps: DepsMut,
+    env: Env,
+    request: RequestPacket,
+    data: Binary,
+) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: sudo response");
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
     let source_port = request
         .source_port
+        .clone()
         .ok_or_else(|| StdError::generic_err("source_port not found"))?;
+
+    save_ibc_callback_state(
+        deps.storage,
+        IbcCallbackState::Response(request, env.block.height),
+    )?;
+
     let is_transfer = source_port == TRANSFER_PORT;
     if is_transfer {
         STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
@@ -345,19 +370,34 @@ fn sudo_response(deps: DepsMut, request: RequestPacket, data: Binary) -> StdResu
     Ok(Response::default())
 }
 
-fn sudo_error(deps: DepsMut, _request: RequestPacket, _details: String) -> StdResult<Response> {
+fn sudo_error(
+    deps: DepsMut,
+    env: Env,
+    request: RequestPacket,
+    details: String,
+) -> StdResult<Response> {
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
+    save_ibc_callback_state(
+        deps.storage,
+        IbcCallbackState::Error(request, details, env.block.height),
+    )?;
 
     Ok(Response::default())
 }
 
 // can be called by response of create ica, ibc transfer and fund community pool
-fn sudo_timeout(deps: DepsMut, _env: Env, request: RequestPacket) -> StdResult<Response> {
+fn sudo_timeout(deps: DepsMut, env: Env, request: RequestPacket) -> StdResult<Response> {
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
     let source_port = request
         .source_port
+        .clone()
         .ok_or_else(|| StdError::generic_err("source_port not found"))?;
+
+    save_ibc_callback_state(
+        deps.storage,
+        IbcCallbackState::Timeout(request, env.block.height),
+    )?;
 
     // ICA transactions timeout closes the channel
     if let Some(ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
@@ -384,10 +424,9 @@ fn sudo_open_ack(
             deps.storage,
             &Some(InterchainAccount {
                 address: parsed_version.address,
-                source_port_id: port_id, // TODO: is this the source port_id ?
+                source_port_id: port_id,
             }),
         )?;
-        STAGE.save(deps.storage, &Stage::SendClaimedTokensToICA)?;
         INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
         return Ok(Response::default());
     }
@@ -422,4 +461,16 @@ fn ibc_fee_from_funds(info: &MessageInfo) -> NeutronResult<(Coin, IbcFee)> {
     };
 
     Ok((fee_funds, fee))
+}
+
+fn save_ibc_callback_state(
+    storage: &mut dyn Storage,
+    callback_state: IbcCallbackState,
+) -> StdResult<()> {
+    IBC_CALLBACK_STATES.update::<_, StdError>(storage, |mut list| {
+        list.push(callback_state);
+        Ok(list)
+    })?;
+
+    Ok(())
 }

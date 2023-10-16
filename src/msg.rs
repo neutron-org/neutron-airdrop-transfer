@@ -25,10 +25,13 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Creates ICA. Can be called if ICA is not created or channel was closed.
     CreateHubICA {},
+
     /// Step 1. Claim unclaimed airdrops and send them to this contract.
     ClaimUnclaimed {},
+
     /// Step 2. Requires ICA to be created. Send funds to ICA account.
     SendClaimedTokensToICA {},
+
     /// Step 3. Requires ICA to be created and open. Fund cosmoshub community pool with sent funds.
     FundCommunityPool {},
 }
@@ -38,10 +41,18 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     #[returns(crate::state::Stage)]
     Stage {},
+
     #[returns(Option<crate::state::InterchainAccount>)]
     InterchainAccount {},
+
     #[returns(cosmwasm_std::Uint128)]
     TransferAmount {},
+
+    #[returns(bool)]
+    InterchainTxInProgress {},
+
+    #[returns(Vec<crate::state::IbcCallbackState>)]
+    IbcCallbackStates {},
 }
 
 #[cw_serde]
