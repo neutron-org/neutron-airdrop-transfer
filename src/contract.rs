@@ -310,7 +310,6 @@ fn sudo_response(
     request: RequestPacket,
     _data: Binary,
 ) -> StdResult<Response> {
-    deps.api.debug("WASMDEBUG: sudo response");
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
     let source_port = request
