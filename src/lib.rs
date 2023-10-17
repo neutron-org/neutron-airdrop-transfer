@@ -4,6 +4,4 @@ pub mod helpers;
 pub mod msg;
 pub mod state;
 
-pub mod outer;
-
 pub use crate::error::ContractError;
