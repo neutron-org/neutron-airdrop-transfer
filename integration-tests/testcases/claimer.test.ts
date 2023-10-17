@@ -175,6 +175,14 @@ describe('Test claim artifact', () => {
         expect(stage).toEqual('claim_unclaimed')
     }, 1000000)
 
+    it('calling step 2 ahead of time does not work before step 1 is finished', async () => {
+        await expect(() =>
+            client.execute(deployer, claimerAddress, {
+                send_claimed_tokens_to_i_c_a: {},
+            }, 'auto', '', [])
+        ).rejects.toThrowError(/incorrect stage: ClaimUnclaimed/)
+    })
+
     it('step 1 - claiming money from airdrop -> credits -> airdrop -> reserve_address (claimerAddress)', async () => {
         await client.execute(deployer, claimerAddress, {
             "claim_unclaimed": {},
@@ -186,6 +194,14 @@ describe('Test claim artifact', () => {
         const creditsBalance = await client.getBalance(creditsAddress, 'untrn')
         expect(creditsBalance.amount).toEqual('0')
     }, 1000000)
+
+    it('calling step 3 ahead of time does not work before step 2 is finished', async () => {
+        await expect(() =>
+            client.execute(deployer, claimerAddress, {
+                fund_community_pool: {},
+            }, 'auto', '', [])
+        ).rejects.toThrow(/incorrect stage: SendClaimedTokensToICA/)
+    })
 
     it('step 2 with timeout - send claimed tokens to ICA account', async () => {
         const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
@@ -213,11 +229,6 @@ describe('Test claim artifact', () => {
         // expect stage to be the old one
         const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
         expect(stage).toEqual('send_claimed_tokens_to_i_c_a')
-
-        // // expect ica to be still present since timeout in IBC does not close ICA
-        // const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
-        // expect(ica).toBeTruthy()
-        // expect(ica.address).toBeTruthy()
 
         // expect timeout callback to be called
         const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
@@ -325,9 +336,15 @@ describe('Test claim artifact', () => {
 
     // TODO: can use allowed/not allowed params? that's complex tho cause need to change params on gaia
     it.skip('step 3 with error - fund community pool', async () => {
-        // TODO: change transfer amount to bigger value (15000)
+        // migrate to incorrect denom
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            ibc_neutron_denom: "uatom",
+        }, 'auto')
 
-        // TODO: execute fund community pool
+        await client.execute(deployer, claimerAddress, {
+            fund_community_pool: {},
+        }, 'auto', '', [{ amount: '8000', denom: 'untrn' }])
+
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
@@ -335,9 +352,16 @@ describe('Test claim artifact', () => {
             return !inProgress
         }, 500000)
 
-        // TODO: should not close ICA
+        const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
+        expect(ica).toBeTruthy()
 
-        // TODO: should not change stage
+        const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
+        expect(stage).toEqual('fund_community_pool')
+
+        // TODO: last callback (and change callback checks after that (+1)!)
+        // const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
+        // const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+        // expect(callbackStates[3].response[0].source_port).toEqual(ica.port_id)
     })
 
     it('step 3 - fund community pool', async () => {
@@ -371,5 +395,3 @@ describe('Test claim artifact', () => {
         expect(icaBalanceInPool.data.balance.amount).toEqual('11500')
     }, 1000000)
 })
-
-// TODO: checks that calling stage ahead of time does not work
