@@ -13,7 +13,6 @@ use serde_json_wasm;
 use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_txs::helpers::decode_acknowledgement_response;
 use neutron_sdk::sudo::msg::{RequestPacket, SudoMsg};
 use neutron_sdk::{NeutronError, NeutronResult};
 
@@ -309,7 +308,7 @@ fn sudo_response(
     deps: DepsMut,
     env: Env,
     request: RequestPacket,
-    data: Binary,
+    _data: Binary,
 ) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: sudo response");
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
@@ -458,9 +457,19 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
         if let Some(ica_timeout_seconds) = msg.ica_timeout_seconds {
             config.ica_timeout_seconds = ica_timeout_seconds;
         }
+        if let Some(ibc_neutron_denom) = msg.ibc_neutron_denom {
+            config.ibc_neutron_denom = ibc_neutron_denom;
+        }
         config
     };
     CONFIG.save(deps.storage, &new_config)?;
+
+    if let Some(mut ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
+        if let Some(address) = msg.ica_address {
+            ica.address = address;
+            INTERCHAIN_ACCOUNT.save(deps.storage, &Some(ica))?;
+        }
+    }
 
     if let Some(transfer_amount) = msg.transfer_amount {
         TRANSFER_AMOUNT.save(deps.storage, &transfer_amount)?;

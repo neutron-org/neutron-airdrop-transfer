@@ -57,6 +57,7 @@ pub enum QueryMsg {
     IbcCallbackStates {},
 }
 
+/// MigrateMsg is for testing purposes only!
 #[cw_serde]
 pub struct MigrateMsg {
     /// timeout for ibc transfer
@@ -67,4 +68,10 @@ pub struct MigrateMsg {
 
     /// fund community pool amount
     pub transfer_amount: Option<Uint128>,
+
+    /// IBC of untrn on gaia network
+    pub ibc_neutron_denom: Option<String>,
+
+    // ica address to send funds to
+    pub ica_address: Option<String>,
 }
