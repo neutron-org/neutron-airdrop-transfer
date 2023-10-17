@@ -214,7 +214,7 @@ fn execute_fund_community_pool(
 
     let ica_msg = MsgFundCommunityPool {
         amount: vec![amount],
-        depositor: ica.address.to_string(),
+        depositor: ica.address,
     };
 
     let mut buf = Vec::new();
@@ -320,7 +320,7 @@ fn sudo_response(
 
     save_ibc_callback_state(
         deps.storage,
-        IbcCallbackState::Response(request.clone(), env.block.height),
+        IbcCallbackState::Response(request, env.block.height),
     )?;
 
     if source_port == TRANSFER_PORT {
