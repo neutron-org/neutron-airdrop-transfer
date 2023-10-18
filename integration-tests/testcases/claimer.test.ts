@@ -192,14 +192,31 @@ describe('Test claim artifact', () => {
     })
 
     it('creates ICA account', async () => {
-        await client.execute(deployer, claimerAddress, {
+        // pause hermes to test creating ica account two times almost simultaneously
+        await context.park.relayers.find(r => r.type() === 'hermes').pause();
+
+        console.log('create first ica account')
+        const first = await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', '', [])
+        console.log('first executed: ' + JSON.stringify(first.logs), null, '\t')
+
+        // second transaction should fail right away
+        console.log('create second ica account')
+       const second = await client.execute(deployer, claimerAddress, {
+            create_hub_i_c_a: {},
+        }, 'auto', '', [])
+        console.log('second executed: ' + JSON.stringify(second.logs), null, '\t')
+
+        console.log('unpaused relayer')
+        await context.park.relayers.find(r => r.type() === 'hermes').unpause();
 
         await waitFor(async () => {
             const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
             return !!(ica && ica.address);
         }, 60000)
+
+        console.log('ica created')
 
         // it does not change stage
         const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
