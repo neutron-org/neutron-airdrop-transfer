@@ -47,7 +47,7 @@ cw2 = "1.1.0"
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
-neutron-sdk = { package = "neutron-sdk", git = "https://github.com/neutron-org/neutron-sdk.git", default-features = false, version = "0.6.1"}
+neutron-sdk = { package = "neutron-sdk", git = "https://github.com/neutron-org/neutron-sdk.git", default-features = false, version = "0.7.0" }
 serde-json-wasm = { version = "0.5.1" }
 cosmos-sdk-proto = { version = "0.16.0", default-features = false }
 prost = "0.11"

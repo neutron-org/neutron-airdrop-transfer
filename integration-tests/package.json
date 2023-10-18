@@ -5,9 +5,7 @@
   "license": "MIT",
   "scripts": {
     "test": "vitest --run",
-    "test:satellite": "vitest satellite",
-    "watch": "vitest",
-    "build-ts-client": "ts-node ../../lionco-integration-tests/src/rebuild-client.ts"
+    "watch": "vitest"
   },
   "dependencies": {
     "@cosmjs/amino": "^0.31.0",
