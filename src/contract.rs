@@ -80,17 +80,13 @@ pub fn execute(
         )));
     }
 
-    let current_stage = STAGE.load(deps.storage)?;
-
     match msg {
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
-        ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info, current_stage),
+        ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info),
         ExecuteMsg::SendClaimedTokensToICA {} => {
-            execute_send_claimed_tokens_to_ica(deps, env, info, current_stage)
+            execute_send_claimed_tokens_to_ica(deps, env, info)
         }
-        ExecuteMsg::FundCommunityPool {} => {
-            execute_fund_community_pool(deps, env, info, current_stage)
-        }
+        ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env, info),
     }
 }
 
@@ -106,8 +102,6 @@ fn execute_create_hub_ica(
         )));
     }
 
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
-
     let config = CONFIG.load(deps.storage)?;
     let register_ica =
         NeutronMsg::register_interchain_account(config.connection_id, ICA_ID.to_string());
@@ -119,14 +113,9 @@ fn execute_claim_unclaimed(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
     _info: MessageInfo,
-    current_stage: Stage,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if current_stage != Stage::ClaimUnclaimed {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "incorrect stage: {:?}",
-            current_stage
-        ))));
-    }
+    assert_stage(deps.storage, Stage::ClaimUnclaimed)?;
+
     STAGE.save(deps.storage, &Stage::SendClaimedTokensToICA {})?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -145,14 +134,8 @@ fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
-    current_stage: Stage,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if current_stage != Stage::SendClaimedTokensToICA {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "incorrect stage: {:?}",
-            current_stage
-        ))));
-    }
+    assert_stage(deps.storage, Stage::SendClaimedTokensToICA)?;
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -191,14 +174,9 @@ fn execute_fund_community_pool(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
     info: MessageInfo,
-    current_stage: Stage,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if current_stage != Stage::FundCommunityPool {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "incorrect stage: {:?}",
-            current_stage
-        ))));
-    }
+    assert_stage(deps.storage, Stage::FundCommunityPool)?;
+
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
@@ -217,19 +195,21 @@ fn execute_fund_community_pool(
         depositor: ica.address,
     };
 
-    let mut buf = Vec::new();
-    buf.reserve(Message::encoded_len(&ica_msg));
+    let any_msg = {
+        let mut buf = Vec::new();
+        buf.reserve(Message::encoded_len(&ica_msg));
 
-    if let Err(e) = Message::encode(&ica_msg, &mut buf) {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            e
-        ))));
-    }
+        if let Err(e) = Message::encode(&ica_msg, &mut buf) {
+            return Err(NeutronError::Std(StdError::generic_err(format!(
+                "Encode error: {}",
+                e
+            ))));
+        }
 
-    let any_msg = ProtobufAny {
-        type_url: MSG_FUND_COMMUNITY_POOL.to_string(),
-        value: Binary::from(buf),
+        ProtobufAny {
+            type_url: MSG_FUND_COMMUNITY_POOL.to_string(),
+            value: Binary::from(buf),
+        }
     };
 
     let (_, fee) = ibc_fee_from_funds(&info)?;
@@ -343,6 +323,7 @@ fn sudo_error(
     details: String,
 ) -> StdResult<Response> {
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
+
     save_ibc_callback_state(
         deps.storage,
         IbcCallbackState::Error(request, details, env.block.height),
@@ -395,7 +376,6 @@ fn sudo_open_ack(
                 counterparty_channel_id,
             }),
         )?;
-        INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
         return Ok(Response::default());
     }
     Err(StdError::generic_err("Can't parse counterparty_version"))
@@ -429,6 +409,17 @@ fn ibc_fee_from_funds(info: &MessageInfo) -> NeutronResult<(Coin, IbcFee)> {
     };
 
     Ok((fee_funds, fee))
+}
+
+fn assert_stage(storage: &dyn Storage, expected_stage: Stage) -> Result<(), NeutronError> {
+    let current_stage = STAGE.load(storage)?;
+    if current_stage != expected_stage {
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "incorrect stage: {:?}",
+            current_stage
+        ))));
+    }
+    Ok(())
 }
 
 fn save_ibc_callback_state(
