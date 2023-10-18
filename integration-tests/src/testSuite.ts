@@ -2,8 +2,7 @@ import cosmopark, { CosmoparkConfig } from '@neutron-org/cosmopark';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { StargateClient } from '@cosmjs/stargate';
 import { Client as NeutronClient } from '@neutron-org/client-ts';
-import {waitFor} from "./helpers/sleep";
-import { Tendermint34Client } from '@cosmjs/tendermint-rpc';
+import { waitFor } from "./helpers/sleep";
 
 const keys = [
   'master',
@@ -25,13 +24,7 @@ const networkConfigs = {
     validators: 1,
     validators_balance: '1000000000',
     genesis_opts: {
-      // 'app_state.staking.params.denom': 'uatom',
-      // 'app_state.staking.params.mint_denom': 'uatom',
       'app_state.staking.params.bond_denom': 'uatom',
-
-      // 'app_state.slashing.params.downtime_jail_duration': '10s',
-      // 'app_state.slashing.params.signed_blocks_window': '10',
-      // 'app_state.staking.params.validator_bond_factor': '10',
       'app_state.interchainaccounts.host_genesis_state.params.allow_messages': [
         '*',
       ],
@@ -94,14 +87,7 @@ const relayersConfig = {
     image: 'hermes',
     log_level: 'trace',
     type: 'hermes',
-  },
-  neutron: {
-    balance: '1000000000',
-    binary: 'neutron-query-relayer',
-    image: 'neutron-org/neutron-query-relayer',
-    log_level: 'info',
-    type: 'neutron',
-  },
+  }
 };
 
 type Keys = (typeof keys)[number];
@@ -109,18 +95,12 @@ type Keys = (typeof keys)[number];
 const awaitFirstBlock = async (rpc: string): Promise<void> =>
     waitFor(async () => {
       try {
-        const tendermintClient = await Tendermint34Client.connect(rpc);
-        const client= await StargateClient.create(tendermintClient);
-
-        // const client = await StargateClient.connect(rpc);
+        const client = await StargateClient.connect(rpc);
         const block = await client.getBlock();
-        // console.log('block: ' + block.id)
         if (block.header.height > 1) {
-          // console.log(`First block found for ${rpc}`)
           return true;
         }
       } catch (e) {
-        // console.log(`Exception trying to find block for ${rpc}. Error: ${e.stack}`)
         return false;
       }
     }, 20_000);
@@ -188,32 +168,22 @@ export const setupPark = async (
         connections: [networks],
         mnemonic: wallets.hermes,
       } as any,
-      {
-        ...relayersConfig.neutron,
-        networks,
-        mnemonic: wallets.ibcrelayer,
-      },
     ];
   }
   const instance = await cosmopark.create(config);
-  // console.log('instance created')
   await Promise.all(
       Object.entries(instance.ports).map(([network, ports]) => {
-            // console.log(`await first block: ${ports.rpc}`);
             return awaitFirstBlock(`127.0.0.1:${ports.rpc}`).catch((e) => {
-              console.log(`Failed to await first block for ${network}: ${e}`);
               throw e;
             })
           }
       ),
   );
-  // console.log('all first blocks found')
   if (needRelayers) {
     await awaitNeutronChannels(
         `127.0.0.1:${instance.ports['neutron'].rest}`,
         `127.0.0.1:${instance.ports['neutron'].rpc}`,
     ).catch((e) => {
-      // console.log(`Failed to await neutron channels: ${e}`);
       throw e;
     });
   }
