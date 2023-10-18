@@ -19,7 +19,7 @@ const networkConfigs = {
     binary: 'gaiad',
     chain_id: 'testgaia-1',
     denom: 'uatom',
-    image: 'gaia-node',
+    image: 'gaia-node-airdroptest',
     prefix: 'cosmos',
     validators: 1,
     validators_balance: '1000000000',
@@ -84,7 +84,7 @@ const relayersConfig = {
       'chains.0.trusting_period': '14days',
       'chains.0.unbonding_period': '504h0m0s',
     },
-    image: 'hermes',
+    image: 'hermes-airdroptest',
     log_level: 'trace',
     type: 'hermes',
   }
