@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::Item;
-use neutron_sdk::sudo::msg::{RequestPacket, RequestPacketTimeoutHeight};
+use neutron_sdk::sudo::msg::RequestPacket;
 
 #[cw_serde]
 pub enum Stage {
@@ -33,7 +33,6 @@ pub struct Config {
     pub airdrop_address: Addr,
     pub channel_id_to_hub: String,
     pub ibc_neutron_denom: String,
-    pub transfer_timeout_height: RequestPacketTimeoutHeight,
     pub ica_timeout_seconds: u64,
 }
 

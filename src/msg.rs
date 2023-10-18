@@ -16,9 +16,6 @@ pub struct InstantiateMsg {
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
 
-    /// timeout for ibc transfer
-    pub transfer_timeout_height: RequestPacketTimeoutHeight,
-
     /// timeout for ica transactions
     pub ica_timeout_seconds: u64,
 }
@@ -32,7 +29,9 @@ pub enum ExecuteMsg {
     ClaimUnclaimed {},
 
     /// Step 2. Requires ICA to be created. Send funds to ICA account.
-    SendClaimedTokensToICA {},
+    SendClaimedTokensToICA {
+        timeout_height: RequestPacketTimeoutHeight,
+    },
 
     /// Step 3. Requires ICA to be created and open. Fund cosmoshub community pool with sent funds.
     FundCommunityPool {},
@@ -60,9 +59,6 @@ pub enum QueryMsg {
 /// MigrateMsg is for testing purposes only!
 #[cw_serde]
 pub struct MigrateMsg {
-    /// timeout for ibc transfer
-    pub transfer_timeout_height: Option<RequestPacketTimeoutHeight>,
-
     /// timeout for ica transactions
     pub ica_timeout_seconds: Option<u64>,
 

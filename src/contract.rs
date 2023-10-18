@@ -13,7 +13,7 @@ use serde_json_wasm;
 use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::sudo::msg::{RequestPacket, SudoMsg};
+use neutron_sdk::sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, SudoMsg};
 use neutron_sdk::{NeutronError, NeutronResult};
 
 use crate::error::ContractError;
@@ -56,7 +56,6 @@ pub fn instantiate(
             airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
             channel_id_to_hub: msg.channel_id_to_hub,
             ibc_neutron_denom: msg.ibc_neutron_denom,
-            transfer_timeout_height: msg.transfer_timeout_height,
             ica_timeout_seconds: msg.ica_timeout_seconds,
         },
     )?;
@@ -83,8 +82,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
         ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info),
-        ExecuteMsg::SendClaimedTokensToICA {} => {
-            execute_send_claimed_tokens_to_ica(deps, env, info)
+        ExecuteMsg::SendClaimedTokensToICA { timeout_height } => {
+            execute_send_claimed_tokens_to_ica(deps, env, info, timeout_height)
         }
         ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env, info),
     }
@@ -134,8 +133,10 @@ fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
+    timeout_height: RequestPacketTimeoutHeight,
 ) -> NeutronResult<Response<NeutronMsg>> {
     assert_stage(deps.storage, Stage::SendClaimedTokensToICA)?;
+
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -157,11 +158,11 @@ fn execute_send_claimed_tokens_to_ica(
 
     let send_msg = NeutronMsg::IbcTransfer {
         source_port: TRANSFER_PORT.to_string(),
-        source_channel: config.channel_id_to_hub.to_string(),
+        source_channel: config.channel_id_to_hub,
         sender: env.contract.address.to_string(),
         receiver: ica.address,
         token: neutron_to_send,
-        timeout_height: config.transfer_timeout_height,
+        timeout_height,
         timeout_timestamp: 0,
         memo: SEND_TO_ICA_MEMO.to_string(),
         fee,
@@ -304,6 +305,7 @@ fn sudo_response(
 
     if source_port == TRANSFER_PORT {
         STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
+        return Ok(Response::default());
     }
 
     // is ICA transaction
@@ -378,6 +380,7 @@ fn sudo_open_ack(
         )?;
         return Ok(Response::default());
     }
+
     Err(StdError::generic_err("Can't parse counterparty_version"))
 }
 
@@ -441,9 +444,6 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
 
     let new_config = {
         let mut config = CONFIG.load(deps.storage)?;
-        if let Some(transfer_timeout_height) = msg.transfer_timeout_height {
-            config.transfer_timeout_height = transfer_timeout_height;
-        }
         if let Some(ica_timeout_seconds) = msg.ica_timeout_seconds {
             config.ica_timeout_seconds = ica_timeout_seconds;
         }

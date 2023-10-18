@@ -158,7 +158,12 @@ describe('Test claim artifact', () => {
     it('calling step 2 ahead of time does not work before step 1 is finished', async () => {
         await expect(() =>
             client.execute(deployer, claimerAddress, {
-                send_claimed_tokens_to_i_c_a: {},
+                send_claimed_tokens_to_i_c_a: {
+                    timeout_height: {
+                        revision_number: 1,
+                        revision_height: 20000,
+                    },
+                },
             }, 'auto', '', [])
         ).rejects.toThrowError(/incorrect stage: ClaimUnclaimed/)
     })
@@ -186,7 +191,12 @@ describe('Test claim artifact', () => {
     it('does not run send claimed steps before creating ICA account', async () => {
         await expect(() =>
             client.execute(deployer, claimerAddress, {
-                send_claimed_tokens_to_i_c_a: {},
+                send_claimed_tokens_to_i_c_a: {
+                    timeout_height: {
+                        revision_number: 1,
+                        revision_height: 20000,
+                    },
+                },
             }, 'auto', '', [])
         ).rejects.toThrowError(/ica is not created or open/)
     })
@@ -203,13 +213,13 @@ describe('Test claim artifact', () => {
 
         // second transaction should fail right away
         console.log('create second ica account')
-       const second = await client.execute(deployer, claimerAddress, {
+        const second = await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', '', [])
         console.log('second executed: ' + JSON.stringify(second.logs), null, '\t')
 
         console.log('unpaused relayer')
-        await context.park.relayers.find(r => r.type() === 'hermes').unpause();
+        // await context.park.relayers.find(r => r.type() === 'hermes').unpause();
 
         await waitFor(async () => {
             const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
@@ -224,22 +234,16 @@ describe('Test claim artifact', () => {
     }, 1000000)
 
     it('step 2 with timeout - send claimed tokens to ICA account', async () => {
-        const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
-
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
-        // migrate timeout to small value
-        await client.migrate(deployer, claimerAddress, claimerCodeId, {
-            transfer_timeout_height: {
-                revision_number: 1,
-                revision_height: (+hubBlock.data.block.header.height) + 1,
-            },
-        }, 'auto')
-
-        await sleep(1000);
-
+        const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {},
+            send_claimed_tokens_to_i_c_a: {
+                timeout_height: {
+                    revision_number: 1,
+                    revision_height: (+hubBlock.data.block.header.height) + 1,
+                },
+            },
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
@@ -260,14 +264,6 @@ describe('Test claim artifact', () => {
         // funds still on contract
         const balanceAfter = await client.getBalance(claimerAddress, 'untrn')
         expect(balanceAfter.amount).toEqual('11500');
-
-        // return back old values
-        await client.migrate(deployer, claimerAddress, claimerCodeId, {
-            transfer_timeout_height: {
-                revision_number: 1,
-                revision_height: 5000
-            }
-        }, 'auto')
     }, 1000000)
 
     it('step 2 with error - send claimed tokens to ICA account', async () => {
@@ -282,8 +278,14 @@ describe('Test claim artifact', () => {
         }, 'auto')
 
         // try to send funds to the module account
+        const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {},
+            send_claimed_tokens_to_i_c_a: {
+                timeout_height: {
+                    revision_number: 1,
+                    revision_height: (+hubBlock.data.block.header.height) + 1,
+                },
+            },
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
@@ -316,7 +318,12 @@ describe('Test claim artifact', () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {},
+            send_claimed_tokens_to_i_c_a: {
+                timeout_height: {
+                    revision_number: 1,
+                    revision_height: 20000,
+                },
+            },
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
