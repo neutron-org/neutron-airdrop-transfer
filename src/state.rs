@@ -61,4 +61,6 @@ pub enum IbcCallbackState {
     Response(RequestPacket, u64),      // request_packet, block_height
     Timeout(RequestPacket, u64),       // request_packet, block_height
     Error(RequestPacket, String, u64), // error with request_packet, details, block_height
+
+    OpenAckError(String, u64, String, String, String, String), // parse_error, block_height, port_id, channel_id, counterparty_channel_id, counterparty_version
 }

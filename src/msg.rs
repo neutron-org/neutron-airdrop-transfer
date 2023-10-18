@@ -30,6 +30,7 @@ pub enum ExecuteMsg {
 
     /// Step 2. Requires ICA to be created. Send funds to ICA account.
     SendClaimedTokensToICA {
+        /// timeout_height is block height on the destination chain when timeout happens for IbcTransfer
         timeout_height: RequestPacketTimeoutHeight,
     },
 

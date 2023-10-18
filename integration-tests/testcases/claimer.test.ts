@@ -129,10 +129,6 @@ describe('Test claim artifact', () => {
             airdrop_address: airdropAddress, // incorrect address, migrated below
             channel_id_to_hub: transferChannel.channel_id, // neutron to cosmoshub transfer channel id
             ibc_neutron_denom: ibcDenom,
-            transfer_timeout_height: {
-                revision_number: 1,
-                revision_height: 5000,
-            },
             ica_timeout_seconds: 5000,
         }, 'credits', 'auto', {
             admin: deployer // want to be able to migrate contract for testing purposes (set low timeout values)
@@ -205,21 +201,15 @@ describe('Test claim artifact', () => {
         // pause hermes to test creating ica account two times almost simultaneously
         await context.park.relayers.find(r => r.type() === 'hermes').pause();
 
-        console.log('create first ica account')
-        const first = await client.execute(deployer, claimerAddress, {
+        await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', '', [])
-        console.log('first executed: ' + JSON.stringify(first.logs), null, '\t')
 
         // second transaction should fail right away
-        console.log('create second ica account')
-        const second = await client.execute(deployer, claimerAddress, {
+        await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', '', [])
-        console.log('second executed: ' + JSON.stringify(second.logs), null, '\t')
-
-        console.log('unpaused relayer')
-        // await context.park.relayers.find(r => r.type() === 'hermes').unpause();
+        await context.park.relayers.find(r => r.type() === 'hermes').unpause();
 
         await waitFor(async () => {
             const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })

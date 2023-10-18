@@ -15,6 +15,7 @@ use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, SudoMsg};
 use neutron_sdk::{NeutronError, NeutronResult};
+use serde_json_wasm::de::Error;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -360,28 +361,43 @@ fn sudo_timeout(deps: DepsMut, env: Env, request: RequestPacket) -> StdResult<Re
 
 fn sudo_open_ack(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     port_id: String,
     channel_id: String,
     counterparty_channel_id: String,
     counterparty_version: String,
 ) -> StdResult<Response> {
-    let parsed_version: Result<OpenAckVersion, _> =
+    let parsed_version: Result<OpenAckVersion, Error> =
         serde_json_wasm::from_str(counterparty_version.as_str());
-    if let Ok(parsed_version) = parsed_version {
-        INTERCHAIN_ACCOUNT.save(
-            deps.storage,
-            &Some(InterchainAccount {
-                address: parsed_version.address,
-                port_id,
-                channel_id,
-                counterparty_channel_id,
-            }),
-        )?;
-        return Ok(Response::default());
+
+    match parsed_version {
+        Ok(version) => {
+            INTERCHAIN_ACCOUNT.save(
+                deps.storage,
+                &Some(InterchainAccount {
+                    address: version.address,
+                    port_id,
+                    channel_id,
+                    counterparty_channel_id,
+                }),
+            )?;
+        }
+        Err(e) => {
+            save_ibc_callback_state(
+                deps.storage,
+                IbcCallbackState::OpenAckError(
+                    e.to_string(),
+                    env.block.height,
+                    port_id,
+                    channel_id,
+                    counterparty_channel_id,
+                    counterparty_version,
+                ),
+            )?;
+        }
     }
 
-    Err(StdError::generic_err("Can't parse counterparty_version"))
+    Ok(Response::default())
 }
 
 fn ibc_fee_from_funds(info: &MessageInfo) -> NeutronResult<(Coin, IbcFee)> {
