@@ -58,6 +58,7 @@ pub fn instantiate(
             channel_id_to_hub: msg.channel_id_to_hub,
             ibc_neutron_denom: msg.ibc_neutron_denom,
             ica_timeout_seconds: msg.ica_timeout_seconds,
+            ibc_transfer_timeout_seconds: msg.ibc_transfer_timeout_seconds,
         },
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
@@ -83,8 +84,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
         ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info),
-        ExecuteMsg::SendClaimedTokensToICA { timeout_height } => {
-            execute_send_claimed_tokens_to_ica(deps, env, info, timeout_height)
+        ExecuteMsg::SendClaimedTokensToICA {} => {
+            execute_send_claimed_tokens_to_ica(deps, env, info)
         }
         ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env, info),
     }
@@ -134,7 +135,6 @@ fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
-    timeout_height: RequestPacketTimeoutHeight,
 ) -> NeutronResult<Response<NeutronMsg>> {
     assert_stage(deps.storage, Stage::SendClaimedTokensToICA)?;
 
@@ -163,8 +163,15 @@ fn execute_send_claimed_tokens_to_ica(
         sender: env.contract.address.to_string(),
         receiver: ica.address,
         token: neutron_to_send,
-        timeout_height,
-        timeout_timestamp: 0,
+        timeout_height: RequestPacketTimeoutHeight {
+            revision_number: None,
+            revision_height: None,
+        },
+        timeout_timestamp: env
+            .block
+            .time
+            .plus_seconds(config.ibc_transfer_timeout_seconds)
+            .nanos(),
         memo: SEND_TO_ICA_MEMO.to_string(),
         fee,
     };
@@ -462,6 +469,9 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
         let mut config = CONFIG.load(deps.storage)?;
         if let Some(ica_timeout_seconds) = msg.ica_timeout_seconds {
             config.ica_timeout_seconds = ica_timeout_seconds;
+        }
+        if let Some(ibc_transfer_timeout_seconds) = msg.ibc_transfer_timeout_seconds {
+            config.ibc_transfer_timeout_seconds = ibc_transfer_timeout_seconds;
         }
         if let Some(ibc_neutron_denom) = msg.ibc_neutron_denom {
             config.ibc_neutron_denom = ibc_neutron_denom;

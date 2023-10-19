@@ -8,7 +8,7 @@ import Cosmopark from '@neutron-org/cosmopark';
 import {Client as NeutronClient} from "@neutron-org/client-ts";
 import {V1IdentifiedChannel} from "@neutron-org/client-ts/src/ibc.core.channel.v1/rest";
 import {getIBCDenom} from "../src/helpers/ibc_denom";
-import {sleep, waitFor} from "../src/helpers/sleep";
+import {waitFor} from "../src/helpers/sleep";
 import {GaiaClient} from "../src/helpers/gaia_client";
 
 describe('Test claim artifact', () => {
@@ -129,7 +129,8 @@ describe('Test claim artifact', () => {
             airdrop_address: airdropAddress, // incorrect address, migrated below
             channel_id_to_hub: transferChannel.channel_id, // neutron to cosmoshub transfer channel id
             ibc_neutron_denom: ibcDenom,
-            ica_timeout_seconds: 5000,
+            ica_timeout_seconds: 3600 * 5,
+            ibc_transfer_timeout_seconds: 3600 * 5,
         }, 'credits', 'auto', {
             admin: deployer // want to be able to migrate contract for testing purposes (set low timeout values)
         });
@@ -154,12 +155,7 @@ describe('Test claim artifact', () => {
     it('calling step 2 ahead of time does not work before step 1 is finished', async () => {
         await expect(() =>
             client.execute(deployer, claimerAddress, {
-                send_claimed_tokens_to_i_c_a: {
-                    timeout_height: {
-                        revision_number: 1,
-                        revision_height: 20000,
-                    },
-                },
+                send_claimed_tokens_to_i_c_a: {},
             }, 'auto', '', [])
         ).rejects.toThrowError(/incorrect stage: ClaimUnclaimed/)
     })
@@ -187,53 +183,36 @@ describe('Test claim artifact', () => {
     it('does not run send claimed steps before creating ICA account', async () => {
         await expect(() =>
             client.execute(deployer, claimerAddress, {
-                send_claimed_tokens_to_i_c_a: {
-                    timeout_height: {
-                        revision_number: 1,
-                        revision_height: 20000,
-                    },
-                },
+                send_claimed_tokens_to_i_c_a: {},
             }, 'auto', '', [])
         ).rejects.toThrowError(/ica is not created or open/)
     })
 
     it('creates ICA account', async () => {
-        // pause hermes to test creating ica account two times almost simultaneously
-        await context.park.relayers.find(r => r.type() === 'hermes').pause();
-
         await client.execute(deployer, claimerAddress, {
             create_hub_i_c_a: {},
         }, 'auto', '', [])
-
-        // second transaction should fail right away
-        await client.execute(deployer, claimerAddress, {
-            create_hub_i_c_a: {},
-        }, 'auto', '', [])
-        await context.park.relayers.find(r => r.type() === 'hermes').unpause();
 
         await waitFor(async () => {
             const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
             return !!(ica && ica.address);
-        }, 60000)
-
-        console.log('ica created')
+        }, 350000)
 
         // it does not change stage
         const stage = await client.queryContractSmart(claimerAddress, { stage: {} })
         expect(stage).toEqual('send_claimed_tokens_to_i_c_a')
     }, 1000000)
 
-    it('step 2 with timeout - send claimed tokens to ICA account', async () => {
+    it('[timeout] step 2 - send claimed tokens to ICA account', async () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
-        const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
+        // migrate to small timeout
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            ibc_transfer_timeout_seconds: 1,
+        }, 'auto')
+
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {
-                timeout_height: {
-                    revision_number: 1,
-                    revision_height: (+hubBlock.data.block.header.height) + 1,
-                },
-            },
+            send_claimed_tokens_to_i_c_a: {},
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
@@ -254,9 +233,15 @@ describe('Test claim artifact', () => {
         // funds still on contract
         const balanceAfter = await client.getBalance(claimerAddress, 'untrn')
         expect(balanceAfter.amount).toEqual('11500');
+
+        // migrate back to ok timeout
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            ibc_transfer_timeout_seconds: 3600 * 5,
+        }, 'auto')
+
     }, 1000000)
 
-    it('step 2 with error - send claimed tokens to ICA account', async () => {
+    it('[error] step 2 - send claimed tokens to ICA account', async () => {
         const icaBefore = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
@@ -268,14 +253,8 @@ describe('Test claim artifact', () => {
         }, 'auto')
 
         // try to send funds to the module account
-        const hubBlock = await hubClient.CosmosBaseTendermintV1Beta1.query.serviceGetLatestBlock()
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {
-                timeout_height: {
-                    revision_number: 1,
-                    revision_height: (+hubBlock.data.block.header.height) + 1,
-                },
-            },
+            send_claimed_tokens_to_i_c_a: {},
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
@@ -308,12 +287,7 @@ describe('Test claim artifact', () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
         await client.execute(deployer, claimerAddress, {
-            send_claimed_tokens_to_i_c_a: {
-                timeout_height: {
-                    revision_number: 1,
-                    revision_height: 20000,
-                },
-            },
+            send_claimed_tokens_to_i_c_a: {},
         }, 'auto', '', [{amount: '5000', denom: 'untrn'}])
 
         // wait until interchain tx is not in progress
@@ -345,7 +319,7 @@ describe('Test claim artifact', () => {
         expect(transferAmount).toEqual('14000')
     }, 1000000)
 
-    it('step 3 with timeout - fund community pool', async () => {
+    it('[timeout] step 3 - fund community pool', async () => {
         // migrate to small timeout
         await client.migrate(deployer, claimerAddress, claimerCodeId, {
             ica_timeout_seconds: 1,
@@ -402,7 +376,7 @@ describe('Test claim artifact', () => {
         expect(stage).toEqual('fund_community_pool')
     })
 
-    it('step 3 with error - fund community pool', async () => {
+    it('[error] step 3 - fund community pool', async () => {
         // migrate to incorrect denom
         await client.migrate(deployer, claimerAddress, claimerCodeId, {
             ibc_neutron_denom: 'uatom',

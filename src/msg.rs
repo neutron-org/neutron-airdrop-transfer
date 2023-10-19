@@ -1,6 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
-use neutron_sdk::sudo::msg::RequestPacketTimeoutHeight;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -16,8 +15,11 @@ pub struct InstantiateMsg {
     // IBC denom of neutron that was sent over our `cosmoshub_channel`
     pub ibc_neutron_denom: String,
 
-    /// timeout for ica transactions
+    /// relative timeout for ica transactions
     pub ica_timeout_seconds: u64,
+
+    /// relative timeout for ibc transfer
+    pub ibc_transfer_timeout_seconds: u64,
 }
 
 #[cw_serde]
@@ -29,10 +31,7 @@ pub enum ExecuteMsg {
     ClaimUnclaimed {},
 
     /// Step 2. Requires ICA to be created. Send funds to ICA account.
-    SendClaimedTokensToICA {
-        /// timeout_height is block height on the destination chain when timeout happens for IbcTransfer
-        timeout_height: RequestPacketTimeoutHeight,
-    },
+    SendClaimedTokensToICA {},
 
     /// Step 3. Requires ICA to be created and open. Fund cosmoshub community pool with sent funds.
     FundCommunityPool {},
@@ -62,6 +61,9 @@ pub enum QueryMsg {
 pub struct MigrateMsg {
     /// timeout for ica transactions
     pub ica_timeout_seconds: Option<u64>,
+
+    /// relative timeout for ibc transfer
+    pub ibc_transfer_timeout_seconds: Option<u64>,
 
     /// fund community pool amount
     pub transfer_amount: Option<Uint128>,

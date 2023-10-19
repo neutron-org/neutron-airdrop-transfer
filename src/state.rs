@@ -34,6 +34,7 @@ pub struct Config {
     pub channel_id_to_hub: String,
     pub ibc_neutron_denom: String,
     pub ica_timeout_seconds: u64,
+    pub ibc_transfer_timeout_seconds: u64,
 }
 
 #[cw_serde]
