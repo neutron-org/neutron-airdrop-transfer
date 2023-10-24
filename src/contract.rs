@@ -121,7 +121,7 @@ fn execute_claim_unclaimed(
 
     let config = CONFIG.load(deps.storage)?;
 
-    // Generate burn submessage and return a response
+    // generate withdraw submessage and return a response
     let claim_message = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config.airdrop_address.to_string(),
         msg: to_binary(&cw20_merkle_airdrop::ExecuteMsg::WithdrawAll {})?,
