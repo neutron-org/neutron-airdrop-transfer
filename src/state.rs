@@ -1,25 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::Item;
 use neutron_sdk::sudo::msg::RequestPacket;
 
-#[cw_serde]
-pub enum Stage {
-    ClaimUnclaimed,
-    SendClaimedTokensToICA,
-    FundCommunityPool,
-    Done,
-}
-
 pub const CONFIG: Item<Config> = Item::new("config");
 
-// current stage to allow for non interrupted execution of operations in strict sequence
-pub const STAGE: Item<Stage> = Item::new("stage");
-
 pub const INTERCHAIN_ACCOUNT: Item<Option<InterchainAccount>> = Item::new("interchain_account");
-
-// amount of unclaimed neutron to transfer
-pub const TRANSFER_AMOUNT: Item<Uint128> = Item::new("transfer_amount");
 
 // if true, interchain operation is in progress and we cannot make an operation
 pub const INTERCHAIN_TX_IN_PROGRESS: Item<bool> = Item::new("interchain_tx_in_progress");
@@ -30,11 +15,9 @@ pub const IBC_CALLBACK_STATES: Item<Vec<IbcCallbackState>> = Item::new("ibc_call
 #[cw_serde]
 pub struct Config {
     pub connection_id: String,
-    pub airdrop_address: Addr,
-    pub channel_id_to_hub: String,
+    pub transfer_channel_id: String,
     pub ibc_neutron_denom: String,
-    pub ica_timeout_seconds: u64,
-    pub ibc_transfer_timeout_seconds: u64,
+    pub ibc_timeout_seconds: u64,
 }
 
 #[cw_serde]
@@ -46,7 +29,6 @@ pub struct InterchainAccount {
     pub counterparty_channel_id: String,
 }
 
-// TODO: can we import it from library?
 #[cw_serde]
 pub struct OpenAckVersion {
     pub version: String,

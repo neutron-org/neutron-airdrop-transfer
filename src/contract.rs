@@ -3,8 +3,8 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgFundCommunityPool;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, WasmMsg,
+    to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    Storage, Uint128,
 };
 use cw2::set_contract_version;
 use prost::Message;
@@ -19,10 +19,9 @@ use serde_json_wasm::de::Error;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::outer::cw20_merkle_airdrop;
 use crate::state::{
-    Config, IbcCallbackState, InterchainAccount, OpenAckVersion, Stage, CONFIG,
-    IBC_CALLBACK_STATES, INTERCHAIN_ACCOUNT, INTERCHAIN_TX_IN_PROGRESS, STAGE, TRANSFER_AMOUNT,
+    Config, IbcCallbackState, InterchainAccount, OpenAckVersion, CONFIG, IBC_CALLBACK_STATES,
+    INTERCHAIN_ACCOUNT, INTERCHAIN_TX_IN_PROGRESS,
 };
 
 const ICA_ID: &str = "funder";
@@ -49,16 +48,13 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    STAGE.save(deps.storage, &Stage::ClaimUnclaimed {})?;
     CONFIG.save(
         deps.storage,
         &Config {
             connection_id: msg.connection_id,
-            airdrop_address: deps.api.addr_validate(&msg.airdrop_address)?,
-            channel_id_to_hub: msg.channel_id_to_hub,
+            transfer_channel_id: msg.transfer_channel_id,
             ibc_neutron_denom: msg.ibc_neutron_denom,
-            ica_timeout_seconds: msg.ica_timeout_seconds,
-            ibc_transfer_timeout_seconds: msg.ibc_transfer_timeout_seconds,
+            ibc_timeout_seconds: msg.ibc_timeout_seconds,
         },
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
@@ -83,11 +79,12 @@ pub fn execute(
 
     match msg {
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
-        ExecuteMsg::ClaimUnclaimed {} => execute_claim_unclaimed(deps, env, info),
         ExecuteMsg::SendClaimedTokensToICA {} => {
             execute_send_claimed_tokens_to_ica(deps, env, info)
         }
-        ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env, info),
+        ExecuteMsg::FundCommunityPool { amount } => {
+            execute_fund_community_pool(deps, env, info, amount)
+        }
     }
 }
 
@@ -110,34 +107,11 @@ fn execute_create_hub_ica(
     Ok(Response::default().add_message(register_ica))
 }
 
-fn execute_claim_unclaimed(
-    deps: DepsMut<NeutronQuery>,
-    _env: Env,
-    _info: MessageInfo,
-) -> NeutronResult<Response<NeutronMsg>> {
-    assert_stage(deps.storage, Stage::ClaimUnclaimed)?;
-
-    STAGE.save(deps.storage, &Stage::SendClaimedTokensToICA {})?;
-
-    let config = CONFIG.load(deps.storage)?;
-
-    // generate withdraw submessage and return a response
-    let claim_message = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: config.airdrop_address.to_string(),
-        msg: to_binary(&cw20_merkle_airdrop::ExecuteMsg::WithdrawAll {})?,
-        funds: vec![],
-    });
-
-    Ok(Response::default().add_message(claim_message))
-}
-
 fn execute_send_claimed_tokens_to_ica(
     deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    assert_stage(deps.storage, Stage::SendClaimedTokensToICA)?;
-
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -151,15 +125,17 @@ fn execute_send_claimed_tokens_to_ica(
         .query_balance(env.contract.address.clone(), NEUTRON_DENOM)?;
 
     let (fee_funds, fee) = ibc_fee_from_funds(&info)?;
-    let neutron_to_send = Coin::new(
-        (neutron_on_balance.amount - fee_funds.amount).u128(),
-        NEUTRON_DENOM,
-    );
-    TRANSFER_AMOUNT.save(deps.storage, &neutron_to_send.amount)?;
+    let neutron_amount_to_send = neutron_on_balance.amount - fee_funds.amount;
+    if neutron_amount_to_send.is_zero() {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "zero neutron to send".to_string(),
+        )));
+    }
+    let neutron_to_send = Coin::new(neutron_amount_to_send.u128(), NEUTRON_DENOM);
 
     let send_msg = NeutronMsg::IbcTransfer {
         source_port: TRANSFER_PORT.to_string(),
-        source_channel: config.channel_id_to_hub,
+        source_channel: config.transfer_channel_id,
         sender: env.contract.address.to_string(),
         receiver: ica.address,
         token: neutron_to_send,
@@ -170,7 +146,7 @@ fn execute_send_claimed_tokens_to_ica(
         timeout_timestamp: env
             .block
             .time
-            .plus_seconds(config.ibc_transfer_timeout_seconds)
+            .plus_seconds(config.ibc_timeout_seconds)
             .nanos(),
         memo: SEND_TO_ICA_MEMO.to_string(),
         fee,
@@ -183,9 +159,8 @@ fn execute_fund_community_pool(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
     info: MessageInfo,
+    amount: Uint128,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    assert_stage(deps.storage, Stage::FundCommunityPool)?;
-
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
@@ -194,13 +169,13 @@ fn execute_fund_community_pool(
         ))
     })?;
 
-    let amount = CosmosCoin {
+    let coin = CosmosCoin {
         denom: config.ibc_neutron_denom.to_string(),
-        amount: TRANSFER_AMOUNT.load(deps.storage)?.to_string(),
+        amount: amount.to_string(),
     };
 
     let ica_msg = MsgFundCommunityPool {
-        amount: vec![amount],
+        amount: vec![coin],
         depositor: ica.address,
     };
 
@@ -227,7 +202,7 @@ fn execute_fund_community_pool(
         ICA_ID.to_string(),
         vec![any_msg],
         FUND_COMMUNITY_POOL_MEMO.to_string(),
-        config.ica_timeout_seconds,
+        config.ibc_timeout_seconds,
         fee,
     );
 
@@ -237,27 +212,15 @@ fn execute_fund_community_pool(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Stage {} => query_stage(deps),
         QueryMsg::InterchainAccount {} => query_interchain_account(deps),
-        QueryMsg::TransferAmount {} => query_transfer_amount(deps),
         QueryMsg::InterchainTxInProgress {} => query_interchain_tx_in_progress(deps),
         QueryMsg::IbcCallbackStates {} => query_ibc_callback_states(deps),
     }
 }
 
-fn query_transfer_amount(deps: Deps) -> StdResult<Binary> {
-    let amount = TRANSFER_AMOUNT.load(deps.storage)?;
-    to_binary(&amount)
-}
-
 fn query_interchain_account(deps: Deps) -> StdResult<Binary> {
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?;
     to_binary(&ica)
-}
-
-fn query_stage(deps: Deps) -> StdResult<Binary> {
-    let stage = STAGE.load(deps.storage)?;
-    to_binary(&stage)
 }
 
 fn query_interchain_tx_in_progress(deps: Deps) -> StdResult<Binary> {
@@ -301,27 +264,10 @@ fn sudo_response(
 ) -> StdResult<Response> {
     INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
 
-    let source_port = request
-        .source_port
-        .clone()
-        .ok_or_else(|| StdError::generic_err("source_port not found"))?;
-
     save_ibc_callback_state(
         deps.storage,
         IbcCallbackState::Response(request, env.block.height),
     )?;
-
-    if source_port == TRANSFER_PORT {
-        STAGE.save(deps.storage, &Stage::FundCommunityPool)?;
-        return Ok(Response::default());
-    }
-
-    // is ICA transaction
-    if let Some(ica) = INTERCHAIN_ACCOUNT.load(deps.storage)? {
-        if source_port == ica.port_id {
-            STAGE.save(deps.storage, &Stage::Done)?;
-        }
-    }
 
     Ok(Response::default())
 }
@@ -437,17 +383,6 @@ fn ibc_fee_from_funds(info: &MessageInfo) -> NeutronResult<(Coin, IbcFee)> {
     Ok((fee_funds, fee))
 }
 
-fn assert_stage(storage: &dyn Storage, expected_stage: Stage) -> Result<(), NeutronError> {
-    let current_stage = STAGE.load(storage)?;
-    if current_stage != expected_stage {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "incorrect stage: {:?}",
-            current_stage
-        ))));
-    }
-    Ok(())
-}
-
 fn save_ibc_callback_state(
     storage: &mut dyn Storage,
     callback_state: IbcCallbackState,
@@ -467,14 +402,8 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
 
     let new_config = {
         let mut config = CONFIG.load(deps.storage)?;
-        if let Some(ica_timeout_seconds) = msg.ica_timeout_seconds {
-            config.ica_timeout_seconds = ica_timeout_seconds;
-        }
-        if let Some(ibc_transfer_timeout_seconds) = msg.ibc_transfer_timeout_seconds {
-            config.ibc_transfer_timeout_seconds = ibc_transfer_timeout_seconds;
-        }
-        if let Some(ibc_neutron_denom) = msg.ibc_neutron_denom {
-            config.ibc_neutron_denom = ibc_neutron_denom;
+        if let Some(ibc_timeout_seconds) = msg.ibc_timeout_seconds {
+            config.ibc_timeout_seconds = ibc_timeout_seconds;
         }
         config
     };
@@ -485,10 +414,6 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
             ica.address = address;
             INTERCHAIN_ACCOUNT.save(deps.storage, &Some(ica))?;
         }
-    }
-
-    if let Some(transfer_amount) = msg.transfer_amount {
-        TRANSFER_AMOUNT.save(deps.storage, &transfer_amount)?;
     }
 
     Ok(Response::default())
