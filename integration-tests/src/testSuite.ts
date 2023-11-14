@@ -105,26 +105,27 @@ const awaitFirstBlock = async (rpc: string): Promise<void> =>
       }
     }, 20_000);
 
-const awaitNeutronChannels = async (rest: string, rpc: string): Promise<void> =>
-    waitFor(async () => {
-      try {
-        const client = new NeutronClient({
-          apiURL: `http://${rest}`,
-          rpcURL: rpc,
-          prefix: 'neutron',
-        });
-        const res = await client.IbcCoreChannelV1.query.queryChannels();
-        if (res.data.channels.length > 0) {
-          let channels = res.data.channels;
-          if (channels.every((c) => c.state === 'STATE_OPEN')) {
-            return true;
-          }
+const awaitNeutronChannels = async (rest: string, rpc: string): Promise<void> => {
+  const client = new NeutronClient({
+    apiURL: `http://${rest}`,
+    rpcURL: rpc,
+    prefix: 'neutron',
+  });
+  await waitFor(async () => {
+    try {
+      const res = await client.IbcCoreChannelV1.query.queryChannels();
+      if (res.data.channels.length > 0) {
+        let channels = res.data.channels;
+        if (channels.every((c) => c.state === 'STATE_OPEN')) {
+          return true;
         }
-      } catch (e) {
-        console.log('failed to find channels: ' + e.message)
-        return false;
       }
-    }, 60_000);
+    } catch (e) {
+      console.log('failed to find channels: ' + e.message)
+      return false;
+    }
+  }, 60_000);
+}
 
 export const generateWallets = async (): Promise<Record<Keys, string>> =>
     keys.reduce(
