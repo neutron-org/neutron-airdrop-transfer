@@ -136,8 +136,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // expect timeout callback to be called
@@ -173,8 +173,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // check callbacks
@@ -202,8 +202,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // balance on contract should be 0 + 2500 refunded timeout fee
@@ -240,8 +240,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // check new callback
@@ -281,8 +281,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
@@ -302,8 +302,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // should return callback

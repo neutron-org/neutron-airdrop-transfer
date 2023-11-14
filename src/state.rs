@@ -6,9 +6,6 @@ pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const INTERCHAIN_ACCOUNT: Item<Option<InterchainAccount>> = Item::new("interchain_account");
 
-// if true, interchain operation is in progress and we cannot make an operation
-pub const INTERCHAIN_TX_IN_PROGRESS: Item<bool> = Item::new("interchain_tx_in_progress");
-
 // to understand what happened with IBC calls
 pub const IBC_CALLBACK_STATES: Item<Vec<IbcCallbackState>> = Item::new("ibc_callback_states");
 

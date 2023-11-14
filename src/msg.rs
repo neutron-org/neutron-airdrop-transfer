@@ -34,9 +34,6 @@ pub enum QueryMsg {
     #[returns(Option<crate::state::InterchainAccount>)]
     InterchainAccount {},
 
-    #[returns(bool)]
-    InterchainTxInProgress {},
-
     #[returns(Vec<crate::state::IbcCallbackState>)]
     IbcCallbackStates {},
 }
