@@ -21,7 +21,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::state::{
     Config, IbcCallbackState, InterchainAccount, OpenAckVersion, CONFIG, IBC_CALLBACK_STATES,
-    INTERCHAIN_ACCOUNT, INTERCHAIN_TX_IN_PROGRESS,
+    INTERCHAIN_ACCOUNT,
 };
 
 const ICA_ID: &str = "funder";
@@ -58,7 +58,6 @@ pub fn instantiate(
         },
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
     IBC_CALLBACK_STATES.save(deps.storage, &vec![])?;
 
     Ok(Response::default())
@@ -71,12 +70,6 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if INTERCHAIN_TX_IN_PROGRESS.load(deps.storage)? {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "interchain transaction is in progress",
-        )));
-    }
-
     match msg {
         ExecuteMsg::CreateHubICA {} => execute_create_hub_ica(deps, env, info),
         ExecuteMsg::SendClaimedTokensToICA {} => {
@@ -112,8 +105,6 @@ fn execute_send_claimed_tokens_to_ica(
     env: Env,
     info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
-
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
         NeutronError::Std(StdError::generic_err(
@@ -161,7 +152,6 @@ fn execute_fund_community_pool(
     info: MessageInfo,
     amount: Uint128,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &true)?;
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
         NeutronError::Std(StdError::generic_err(
@@ -213,7 +203,6 @@ fn execute_fund_community_pool(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::InterchainAccount {} => query_interchain_account(deps),
-        QueryMsg::InterchainTxInProgress {} => query_interchain_tx_in_progress(deps),
         QueryMsg::IbcCallbackStates {} => query_ibc_callback_states(deps),
     }
 }
@@ -221,11 +210,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_interchain_account(deps: Deps) -> StdResult<Binary> {
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?;
     to_binary(&ica)
-}
-
-fn query_interchain_tx_in_progress(deps: Deps) -> StdResult<Binary> {
-    let ica_in_progress = INTERCHAIN_TX_IN_PROGRESS.load(deps.storage)?;
-    to_binary(&ica_in_progress)
 }
 
 fn query_ibc_callback_states(deps: Deps) -> StdResult<Binary> {
@@ -262,8 +246,6 @@ fn sudo_response(
     request: RequestPacket,
     _data: Binary,
 ) -> StdResult<Response> {
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
-
     save_ibc_callback_state(
         deps.storage,
         IbcCallbackState::Response(request, env.block.height),
@@ -278,8 +260,6 @@ fn sudo_error(
     request: RequestPacket,
     details: String,
 ) -> StdResult<Response> {
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
-
     save_ibc_callback_state(
         deps.storage,
         IbcCallbackState::Error(request, details, env.block.height),
@@ -290,8 +270,7 @@ fn sudo_error(
 
 // can be called by response of create ica, ibc transfer and fund community pool
 fn sudo_timeout(deps: DepsMut, env: Env, request: RequestPacket) -> StdResult<Response> {
-    INTERCHAIN_TX_IN_PROGRESS.save(deps.storage, &false)?;
-
+    // save into callback state and cleanup ICA
     let source_port = request
         .source_port
         .clone()
