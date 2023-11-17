@@ -1,4 +1,5 @@
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Uint128;
 use cw_storage_plus::Item;
 use neutron_sdk::sudo::msg::RequestPacket;
 
@@ -15,6 +16,7 @@ pub struct Config {
     pub transfer_channel_id: String,
     pub ibc_neutron_denom: String,
     pub ibc_timeout_seconds: u64,
+    pub amount: Uint128,
 }
 
 #[cw_serde]

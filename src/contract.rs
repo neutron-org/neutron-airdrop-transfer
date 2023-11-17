@@ -55,6 +55,7 @@ pub fn instantiate(
             transfer_channel_id: msg.transfer_channel_id,
             ibc_neutron_denom: msg.ibc_neutron_denom,
             ibc_timeout_seconds: msg.ibc_timeout_seconds,
+            amount: msg.amount,
         },
     )?;
     INTERCHAIN_ACCOUNT.save(deps.storage, &None)?;
@@ -75,9 +76,7 @@ pub fn execute(
         ExecuteMsg::SendClaimedTokensToICA {} => {
             execute_send_claimed_tokens_to_ica(deps, env, info)
         }
-        ExecuteMsg::FundCommunityPool { amount } => {
-            execute_fund_community_pool(deps, env, info, amount)
-        }
+        ExecuteMsg::FundCommunityPool {} => execute_fund_community_pool(deps, env, info),
     }
 }
 
@@ -150,7 +149,6 @@ fn execute_fund_community_pool(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
     info: MessageInfo,
-    amount: Uint128,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let config = CONFIG.load(deps.storage)?;
     let ica = INTERCHAIN_ACCOUNT.load(deps.storage)?.ok_or_else(|| {
@@ -161,7 +159,7 @@ fn execute_fund_community_pool(
 
     let coin = CosmosCoin {
         denom: config.ibc_neutron_denom.to_string(),
-        amount: amount.to_string(),
+        amount: config.amount.to_string(),
     };
 
     let ica_msg = MsgFundCommunityPool {
@@ -384,6 +382,11 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
         if let Some(ibc_timeout_seconds) = msg.ibc_timeout_seconds {
             config.ibc_timeout_seconds = ibc_timeout_seconds;
         }
+
+        if let Some(amount) = msg.amount {
+            config.amount = amount;
+        }
+
         config
     };
     CONFIG.save(deps.storage, &new_config)?;
