@@ -14,6 +14,9 @@ pub struct InstantiateMsg {
 
     /// relative timeout for ica transactions
     pub ibc_timeout_seconds: u64,
+
+    /// amount of tokens to fund community pool
+    pub amount: Uint128,
 }
 
 #[cw_serde]
@@ -25,7 +28,7 @@ pub enum ExecuteMsg {
     SendClaimedTokensToICA {},
 
     /// Requires ICA to be created and open. Funds cosmoshub community pool with given `amount` of funds.
-    FundCommunityPool { amount: Uint128 },
+    FundCommunityPool {},
 }
 
 #[cw_serde]
@@ -33,9 +36,6 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     #[returns(Option<crate::state::InterchainAccount>)]
     InterchainAccount {},
-
-    #[returns(bool)]
-    InterchainTxInProgress {},
 
     #[returns(Vec<crate::state::IbcCallbackState>)]
     IbcCallbackStates {},
@@ -49,4 +49,7 @@ pub struct MigrateMsg {
 
     // ica address to send funds to
     pub ica_address: Option<String>,
+
+    // amount to fund community pool
+    pub amount: Option<Uint128>,
 }

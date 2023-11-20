@@ -83,6 +83,7 @@ describe('Test claimer artifact', () => {
             transfer_channel_id: transferChannel.channel_id, // neutron to cosmoshub transfer channel id
             ibc_neutron_denom: ibcDenom,
             ibc_timeout_seconds: 3600 * 5,
+            amount: '14000',
         }, 'credits', 'auto', {
             admin: deployer // want to be able to migrate contract for testing purposes (set low timeout values)
         })
@@ -106,7 +107,7 @@ describe('Test claimer artifact', () => {
 
         await expect(() =>
             client.execute(deployer, claimerAddress, {
-                fund_community_pool: { amount: '9000' },
+                fund_community_pool: { },
             }, 'auto', '', [])
         ).rejects.toThrowError(/ica is not created or open/)
     })
@@ -136,8 +137,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // expect timeout callback to be called
@@ -173,8 +174,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // check callbacks
@@ -202,8 +203,8 @@ describe('Test claimer artifact', () => {
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // balance on contract should be 0 + 2500 refunded timeout fee
@@ -235,13 +236,13 @@ describe('Test claimer artifact', () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
         await client.execute(deployer, claimerAddress, {
-            fund_community_pool: { amount: '14000' },
+            fund_community_pool: { },
         }, 'auto', 'fund community pool', [{ amount: '8000', denom: 'untrn' }])
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // check new callback
@@ -274,15 +275,20 @@ describe('Test claimer artifact', () => {
     it('[error] fund community pool', async () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
+        // migrate to big amount
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            amount: '200000',
+        }, 'auto')
+
         // run step 3 with amount that is too big
         await client.execute(deployer, claimerAddress, {
-            fund_community_pool: { amount: '125000' },
+            fund_community_pool: { },
         }, 'auto', '', [{ amount: '8000', denom: 'untrn' }])
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         const ica = await client.queryContractSmart(claimerAddress, { interchain_account: {} })
@@ -291,19 +297,25 @@ describe('Test claimer artifact', () => {
         const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
         expect(callbackStates.length).toEqual(callbackStatesLengthBefore + 1)
         expect(callbackStates[callbackStates.length - 1].error[0].source_port).toEqual(ica.port_id)
+
+        // returns back original amount
+        // migrate to big amount
+        await client.migrate(deployer, claimerAddress, claimerCodeId, {
+            amount: '14000',
+        }, 'auto')
     })
 
     it('[success] fund community pool', async () => {
         const callbackStatesLengthBefore = (await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })).length
 
         await client.execute(deployer, claimerAddress, {
-            fund_community_pool: { amount: '14000' },
+            fund_community_pool: { },
         }, 'auto', '', [{ amount: '8000', denom: 'untrn' }])
 
         // wait until interchain tx is not in progress
         await waitFor(async () => {
-            const inProgress = await client.queryContractSmart(claimerAddress, { interchain_tx_in_progress: {} })
-            return !inProgress
+            const callbackStates = await client.queryContractSmart(claimerAddress, { ibc_callback_states: {} })
+            return callbackStates.length === callbackStatesLengthBefore + 1
         }, 500000)
 
         // should return callback

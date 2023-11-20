@@ -1,13 +1,11 @@
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Uint128;
 use cw_storage_plus::Item;
 use neutron_sdk::sudo::msg::RequestPacket;
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const INTERCHAIN_ACCOUNT: Item<Option<InterchainAccount>> = Item::new("interchain_account");
-
-// if true, interchain operation is in progress and we cannot make an operation
-pub const INTERCHAIN_TX_IN_PROGRESS: Item<bool> = Item::new("interchain_tx_in_progress");
 
 // to understand what happened with IBC calls
 pub const IBC_CALLBACK_STATES: Item<Vec<IbcCallbackState>> = Item::new("ibc_callback_states");
@@ -18,6 +16,7 @@ pub struct Config {
     pub transfer_channel_id: String,
     pub ibc_neutron_denom: String,
     pub ibc_timeout_seconds: u64,
+    pub amount: Uint128,
 }
 
 #[cw_serde]
