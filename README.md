@@ -1,4 +1,10 @@
-# Transfer unclaimed airdrop funds from neutron-1 to cosmoshub-4
+# The contract implements a logic to transfer `NTRN` tokens to Cosmos Hub Community Pool.
+
+### Methods
+
+- `CreateHubICA` *-* creates an ICA on a remote chain;
+- `SendClaimedTokensToICA` - send all NTRN tokens from the contract to the created ICA via IBC;
+- `FundCommunityPool` *-* issues an ICTX to fund a community pool with previously transfered NTRN tokens.
 
 ## Run integration tests
 
