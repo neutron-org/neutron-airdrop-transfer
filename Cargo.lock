@@ -527,7 +527,7 @@ checksum = "9cdc71e17332e86d2e1d38c1f99edcb6288ee11b815fb1a4b049eaa2114d369b"
 
 [[package]]
 name = "neutron-airdrop-transfer"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cosmos-sdk-proto 0.16.0",
  "cosmwasm-schema",
