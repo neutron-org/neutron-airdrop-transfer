@@ -1,6 +1,6 @@
 [package]
 name = "neutron-airdrop-transfer"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["nhpd <dmitry.klpv@gmail.com>"]
 edition = "2021"
 
