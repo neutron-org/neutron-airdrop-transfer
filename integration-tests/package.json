@@ -8,14 +8,14 @@
     "watch": "vitest"
   },
   "dependencies": {
-    "@cosmjs/amino": "^0.31.0",
-    "@cosmjs/cosmwasm-stargate": "^0.31.0",
+    "@cosmjs/amino": "^0.33.1",
+    "@cosmjs/cosmwasm-stargate": "^0.33.1",
     "@cosmjs/proto-signing": "^0.31.0",
     "@cosmjs/stargate": "^0.31.0",
     "@neutron-org/client-ts": "^1.4.0",
     "@neutron-org/contracts2ts": "^1.3.1",
     "@neutron-org/cosmopark": "^1.2.9",
-    "@neutron-org/neutronjsplus": "0.0.15",
+    "@neutron-org/neutronjsplus": "0.5.0",
     "crypto-js": "^4.1.1"
   },
   "devDependencies": {
