@@ -8,8 +8,8 @@
     "watch": "vitest"
   },
   "dependencies": {
-    "@cosmjs/amino": "^0.31.0",
-    "@cosmjs/cosmwasm-stargate": "^0.31.0",
+    "@cosmjs/amino": "^0.34.0",
+    "@cosmjs/cosmwasm-stargate": "^0.34.0",
     "@cosmjs/proto-signing": "^0.31.0",
     "@cosmjs/stargate": "^0.31.0",
     "@neutron-org/client-ts": "^1.4.0",
